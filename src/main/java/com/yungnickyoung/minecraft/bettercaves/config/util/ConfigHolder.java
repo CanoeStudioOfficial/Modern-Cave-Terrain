@@ -168,6 +168,27 @@ public class ConfigHolder {
         cheeseCaveSize = new ConfigOption<>("Cheese Cave Size", Configuration.caveSettings.modernCaves.cheeseCaves.size)
             .setCategory("general.underground generation.modern caves.cheese caves")
             .addToMap(properties);
+        cheeseCaveNoiseFrequency = new ConfigOption<>("Cheese Cave Noise Frequency", Configuration.caveSettings.modernCaves.cheeseCaves.noiseFrequency)
+            .setCategory("general.underground generation.modern caves.cheese caves")
+            .addToMap(properties);
+        cheeseCaveNoiseThreshold = new ConfigOption<>("Cheese Cave Noise Threshold", Configuration.caveSettings.modernCaves.cheeseCaves.noiseThreshold)
+            .setCategory("general.underground generation.modern caves.cheese caves")
+            .addToMap(properties);
+        cheeseCaveVerticalStretch = new ConfigOption<>("Cheese Cave Vertical Stretch", Configuration.caveSettings.modernCaves.cheeseCaves.verticalStretch)
+            .setCategory("general.underground generation.modern caves.cheese caves")
+            .addToMap(properties);
+        cheeseCavePerturbAmp = new ConfigOption<>("Cheese Cave Perturb Amp", Configuration.caveSettings.modernCaves.cheeseCaves.perturbAmp)
+            .setCategory("general.underground generation.modern caves.cheese caves")
+            .addToMap(properties);
+        cheeseCavePerturbFrequency = new ConfigOption<>("Cheese Cave Perturb Frequency", Configuration.caveSettings.modernCaves.cheeseCaves.perturbFrequency)
+            .setCategory("general.underground generation.modern caves.cheese caves")
+            .addToMap(properties);
+        cheeseCaveDetailFrequency = new ConfigOption<>("Cheese Cave Detail Frequency", Configuration.caveSettings.modernCaves.cheeseCaves.detailFrequency)
+            .setCategory("general.underground generation.modern caves.cheese caves")
+            .addToMap(properties);
+        cheeseCaveDetailWeight = new ConfigOption<>("Cheese Cave Detail Weight", Configuration.caveSettings.modernCaves.cheeseCaves.detailWeight)
+            .setCategory("general.underground generation.modern caves.cheese caves")
+            .addToMap(properties);
 
         enableNoodleCaves = new ConfigOption<>("Enable Noodle Caves", Configuration.caveSettings.modernCaves.noodleCaves.enableNoodleCaves)
             .setCategory("general.underground generation.modern caves.noodle caves")
@@ -178,6 +199,24 @@ public class ConfigHolder {
         noodleCaveThickness = new ConfigOption<>("Noodle Cave Thickness", Configuration.caveSettings.modernCaves.noodleCaves.thickness)
             .setCategory("general.underground generation.modern caves.noodle caves")
             .addToMap(properties);
+        noodleCaveNoiseFrequency = new ConfigOption<>("Noodle Cave Noise Frequency", Configuration.caveSettings.modernCaves.noodleCaves.noiseFrequency)
+            .setCategory("general.underground generation.modern caves.noodle caves")
+            .addToMap(properties);
+        noodleCaveVerticalStretch = new ConfigOption<>("Noodle Cave Vertical Stretch", Configuration.caveSettings.modernCaves.noodleCaves.verticalStretch)
+            .setCategory("general.underground generation.modern caves.noodle caves")
+            .addToMap(properties);
+        noodleCavePerturbAmp = new ConfigOption<>("Noodle Cave Perturb Amp", Configuration.caveSettings.modernCaves.noodleCaves.perturbAmp)
+            .setCategory("general.underground generation.modern caves.noodle caves")
+            .addToMap(properties);
+        noodleCavePerturbFrequency = new ConfigOption<>("Noodle Cave Perturb Frequency", Configuration.caveSettings.modernCaves.noodleCaves.perturbFrequency)
+            .setCategory("general.underground generation.modern caves.noodle caves")
+            .addToMap(properties);
+        noodleCaveToggleFrequency = new ConfigOption<>("Noodle Cave Toggle Frequency", Configuration.caveSettings.modernCaves.noodleCaves.toggleFrequency)
+            .setCategory("general.underground generation.modern caves.noodle caves")
+            .addToMap(properties);
+        noodleCaveToggleThreshold = new ConfigOption<>("Noodle Cave Toggle Threshold", Configuration.caveSettings.modernCaves.noodleCaves.toggleThreshold)
+            .setCategory("general.underground generation.modern caves.noodle caves")
+            .addToMap(properties);
 
         enableSpaghettiCaves = new ConfigOption<>("Enable Spaghetti Caves", Configuration.caveSettings.modernCaves.spaghettiCaves.enableSpaghettiCaves)
             .setCategory("general.underground generation.modern caves.spaghetti caves")
@@ -186,6 +225,21 @@ public class ConfigHolder {
             .setCategory("general.underground generation.modern caves.spaghetti caves")
             .addToMap(properties);
         spaghettiCaveThickness = new ConfigOption<>("Spaghetti Cave Thickness", Configuration.caveSettings.modernCaves.spaghettiCaves.thickness)
+            .setCategory("general.underground generation.modern caves.spaghetti caves")
+            .addToMap(properties);
+        spaghettiCaveNoiseFrequency = new ConfigOption<>("Spaghetti Cave Noise Frequency", Configuration.caveSettings.modernCaves.spaghettiCaves.noiseFrequency)
+            .setCategory("general.underground generation.modern caves.spaghetti caves")
+            .addToMap(properties);
+        spaghettiCaveVerticalStretch = new ConfigOption<>("Spaghetti Cave Vertical Stretch", Configuration.caveSettings.modernCaves.spaghettiCaves.verticalStretch)
+            .setCategory("general.underground generation.modern caves.spaghetti caves")
+            .addToMap(properties);
+        spaghettiCavePerturbAmp = new ConfigOption<>("Spaghetti Cave Perturb Amp", Configuration.caveSettings.modernCaves.spaghettiCaves.perturbAmp)
+            .setCategory("general.underground generation.modern caves.spaghetti caves")
+            .addToMap(properties);
+        spaghettiCavePerturbFrequency = new ConfigOption<>("Spaghetti Cave Perturb Frequency", Configuration.caveSettings.modernCaves.spaghettiCaves.perturbFrequency)
+            .setCategory("general.underground generation.modern caves.spaghetti caves")
+            .addToMap(properties);
+        spaghettiCaveRoughnessFrequency = new ConfigOption<>("Spaghetti Cave Roughness Frequency", Configuration.caveSettings.modernCaves.spaghettiCaves.roughnessFrequency)
             .setCategory("general.underground generation.modern caves.spaghetti caves")
             .addToMap(properties);
 
@@ -464,14 +518,32 @@ public class ConfigHolder {
     public ConfigOption<Boolean> enableCheeseCaves;
     public ConfigOption<Float>   cheeseCaveSpawnChance;
     public ConfigOption<Float>   cheeseCaveSize;
+    public ConfigOption<Float>   cheeseCaveNoiseFrequency;
+    public ConfigOption<Float>   cheeseCaveNoiseThreshold;
+    public ConfigOption<Float>   cheeseCaveVerticalStretch;
+    public ConfigOption<Float>   cheeseCavePerturbAmp;
+    public ConfigOption<Float>   cheeseCavePerturbFrequency;
+    public ConfigOption<Float>   cheeseCaveDetailFrequency;
+    public ConfigOption<Float>   cheeseCaveDetailWeight;
 
     public ConfigOption<Boolean> enableNoodleCaves;
     public ConfigOption<Float>   noodleCaveSpawnChance;
     public ConfigOption<Float>   noodleCaveThickness;
+    public ConfigOption<Float>   noodleCaveNoiseFrequency;
+    public ConfigOption<Float>   noodleCaveVerticalStretch;
+    public ConfigOption<Float>   noodleCavePerturbAmp;
+    public ConfigOption<Float>   noodleCavePerturbFrequency;
+    public ConfigOption<Float>   noodleCaveToggleFrequency;
+    public ConfigOption<Float>   noodleCaveToggleThreshold;
 
     public ConfigOption<Boolean> enableSpaghettiCaves;
     public ConfigOption<Float>   spaghettiCaveSpawnChance;
     public ConfigOption<Float>   spaghettiCaveThickness;
+    public ConfigOption<Float>   spaghettiCaveNoiseFrequency;
+    public ConfigOption<Float>   spaghettiCaveVerticalStretch;
+    public ConfigOption<Float>   spaghettiCavePerturbAmp;
+    public ConfigOption<Float>   spaghettiCavePerturbFrequency;
+    public ConfigOption<Float>   spaghettiCaveRoughnessFrequency;
 
     public ConfigOption<Boolean> enableModernCanyons;
     public ConfigOption<Float>   canyonSpawnChance;

@@ -68,6 +68,62 @@ public class ConfigModernCaves {
         @Config.RangeDouble(min = 0, max = 1)
         @Config.RequiresWorldRestart
         public float size = .64f;
+
+        @Config.Name("Cheese Cave Noise Frequency")
+        @Config.Comment(
+            "CaveGenerator-style 3D noise frequency for cheese cave chambers.\n" +
+                "Default: 0.02")
+        @Config.RangeDouble(min = 0.001, max = 0.2)
+        @Config.RequiresWorldRestart
+        public float noiseFrequency = .02f;
+
+        @Config.Name("Cheese Cave Noise Threshold")
+        @Config.Comment(
+            "Base threshold for cheese cave noise. Lower values make fewer chambers.\n" +
+                "Default: -0.5")
+        @Config.RangeDouble(min = -1, max = 1)
+        @Config.RequiresWorldRestart
+        public float noiseThreshold = -.5f;
+
+        @Config.Name("Cheese Cave Vertical Stretch")
+        @Config.Comment(
+            "Vertical stretch for cheese cave noise. Values below 1 make taller open rooms.\n" +
+                "Default: 0.5")
+        @Config.RangeDouble(min = 0.1, max = 4)
+        @Config.RequiresWorldRestart
+        public float verticalStretch = .5f;
+
+        @Config.Name("Cheese Cave Perturb Amp")
+        @Config.Comment(
+            "Coordinate warp strength for cheese cave noise.\n" +
+                "Default: 10")
+        @Config.RangeDouble(min = 0, max = 32)
+        @Config.RequiresWorldRestart
+        public float perturbAmp = 10f;
+
+        @Config.Name("Cheese Cave Perturb Frequency")
+        @Config.Comment(
+            "Coordinate warp frequency for cheese cave noise.\n" +
+                "Default: 0.025")
+        @Config.RangeDouble(min = 0, max = 0.2)
+        @Config.RequiresWorldRestart
+        public float perturbFrequency = .025f;
+
+        @Config.Name("Cheese Cave Detail Frequency")
+        @Config.Comment(
+            "Secondary detail noise frequency for breaking up cheese cave walls.\n" +
+                "Default: 0.045")
+        @Config.RangeDouble(min = 0.001, max = 0.3)
+        @Config.RequiresWorldRestart
+        public float detailFrequency = .045f;
+
+        @Config.Name("Cheese Cave Detail Weight")
+        @Config.Comment(
+            "How much secondary noise roughens cheese cave chambers.\n" +
+                "Default: 0.22")
+        @Config.RangeDouble(min = 0, max = 1)
+        @Config.RequiresWorldRestart
+        public float detailWeight = .22f;
     }
 
     public static class NoodleCaves {
@@ -91,6 +147,54 @@ public class ConfigModernCaves {
         @Config.RangeDouble(min = 0.01, max = 0.2)
         @Config.RequiresWorldRestart
         public float thickness = .055f;
+
+        @Config.Name("Noodle Cave Noise Frequency")
+        @Config.Comment(
+            "CaveGenerator-style 3D noise frequency for noodle cave passages.\n" +
+                "Default: 0.086")
+        @Config.RangeDouble(min = 0.001, max = 0.3)
+        @Config.RequiresWorldRestart
+        public float noiseFrequency = .086f;
+
+        @Config.Name("Noodle Cave Vertical Stretch")
+        @Config.Comment(
+            "Vertical stretch for noodle cave noise.\n" +
+                "Default: 1.0")
+        @Config.RangeDouble(min = 0.1, max = 4)
+        @Config.RequiresWorldRestart
+        public float verticalStretch = 1f;
+
+        @Config.Name("Noodle Cave Perturb Amp")
+        @Config.Comment(
+            "Coordinate warp strength for noodle cave noise.\n" +
+                "Default: 1.5")
+        @Config.RangeDouble(min = 0, max = 16)
+        @Config.RequiresWorldRestart
+        public float perturbAmp = 1.5f;
+
+        @Config.Name("Noodle Cave Perturb Frequency")
+        @Config.Comment(
+            "Coordinate warp frequency for noodle cave noise.\n" +
+                "Default: 0.035")
+        @Config.RangeDouble(min = 0, max = 0.2)
+        @Config.RequiresWorldRestart
+        public float perturbFrequency = .035f;
+
+        @Config.Name("Noodle Cave Toggle Frequency")
+        @Config.Comment(
+            "Low-frequency noise gate that breaks noodle caves into separate runs.\n" +
+                "Default: 0.026")
+        @Config.RangeDouble(min = 0.001, max = 0.2)
+        @Config.RequiresWorldRestart
+        public float toggleFrequency = .026f;
+
+        @Config.Name("Noodle Cave Toggle Threshold")
+        @Config.Comment(
+            "Threshold for the noodle cave gate. Higher values make fewer continuous passages.\n" +
+                "Default: -0.18")
+        @Config.RangeDouble(min = -1, max = 1)
+        @Config.RequiresWorldRestart
+        public float toggleThreshold = -.18f;
     }
 
     public static class SpaghettiCaves {
@@ -114,6 +218,46 @@ public class ConfigModernCaves {
         @Config.RangeDouble(min = 0.03, max = 0.35)
         @Config.RequiresWorldRestart
         public float thickness = .12f;
+
+        @Config.Name("Spaghetti Cave Noise Frequency")
+        @Config.Comment(
+            "CaveGenerator-style 3D noise frequency for spaghetti cave tunnels.\n" +
+                "Default: 0.038")
+        @Config.RangeDouble(min = 0.001, max = 0.3)
+        @Config.RequiresWorldRestart
+        public float noiseFrequency = .038f;
+
+        @Config.Name("Spaghetti Cave Vertical Stretch")
+        @Config.Comment(
+            "Vertical stretch for spaghetti cave noise.\n" +
+                "Default: 0.75")
+        @Config.RangeDouble(min = 0.1, max = 4)
+        @Config.RequiresWorldRestart
+        public float verticalStretch = .75f;
+
+        @Config.Name("Spaghetti Cave Perturb Amp")
+        @Config.Comment(
+            "Coordinate warp strength for spaghetti cave noise.\n" +
+                "Default: 4")
+        @Config.RangeDouble(min = 0, max = 24)
+        @Config.RequiresWorldRestart
+        public float perturbAmp = 4f;
+
+        @Config.Name("Spaghetti Cave Perturb Frequency")
+        @Config.Comment(
+            "Coordinate warp frequency for spaghetti cave noise.\n" +
+                "Default: 0.025")
+        @Config.RangeDouble(min = 0, max = 0.2)
+        @Config.RequiresWorldRestart
+        public float perturbFrequency = .025f;
+
+        @Config.Name("Spaghetti Cave Roughness Frequency")
+        @Config.Comment(
+            "Frequency of thickness variation along spaghetti tunnels.\n" +
+                "Default: 0.075")
+        @Config.RangeDouble(min = 0.001, max = 0.3)
+        @Config.RequiresWorldRestart
+        public float roughnessFrequency = .075f;
     }
 
     public static class Canyons {

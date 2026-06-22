@@ -39,27 +39,30 @@ public class ModernCaveCarverController {
     private final int liquidAltitude;
     private final float cheeseSpawnChance;
     private final float cheeseCaveSize;
+    private final float cheeseNoiseThreshold;
+    private final float cheeseDetailWeight;
     private final float noodleSpawnChance;
     private final float noodleThickness;
+    private final float noodleToggleThreshold;
     private final float spaghettiSpawnChance;
     private final float spaghettiThickness;
+    private final float spaghettiRoughnessFrequency;
     private final float canyonSpawnChance;
     private final float canyonWidth;
     private final IBlockState canyonLavaBlock;
 
     private final OpenSimplex2S cheeseRegionNoise;
-    private final OpenSimplex2S cheeseShapeNoise;
-    private final OpenSimplex2S cheeseDetailNoise;
-    private final OpenSimplex2S cheeseWarpNoise;
     private final OpenSimplex2S spaghettiRegionNoise;
-    private final OpenSimplex2S spaghettiANoise;
-    private final OpenSimplex2S spaghettiBNoise;
     private final OpenSimplex2S spaghettiRoughnessNoise;
     private final OpenSimplex2S noodleRegionNoise;
-    private final OpenSimplex2S noodleANoise;
-    private final OpenSimplex2S noodleBNoise;
-    private final OpenSimplex2S noodleToggleNoise;
     private final OpenSimplex2S canyonWallNoise;
+    private final ProgrammableNoiseSampler cheeseSampler;
+    private final ProgrammableNoiseSampler cheeseDetailSampler;
+    private final ProgrammableNoiseSampler spaghettiASampler;
+    private final ProgrammableNoiseSampler spaghettiBSampler;
+    private final ProgrammableNoiseSampler noodleASampler;
+    private final ProgrammableNoiseSampler noodleBSampler;
+    private final ProgrammableNoiseSampler noodleToggleSampler;
 
     public ModernCaveCarverController(World worldIn, ConfigHolder config) {
         this.world = worldIn;
@@ -76,10 +79,14 @@ public class ModernCaveCarverController {
         this.liquidAltitude = config.liquidAltitude.get();
         this.cheeseSpawnChance = clamp01(config.cheeseCaveSpawnChance.get() / 100f);
         this.cheeseCaveSize = clamp01(config.cheeseCaveSize.get());
+        this.cheeseNoiseThreshold = config.cheeseCaveNoiseThreshold.get();
+        this.cheeseDetailWeight = clamp(config.cheeseCaveDetailWeight.get(), 0f, 1f);
         this.noodleSpawnChance = clamp01(config.noodleCaveSpawnChance.get() / 100f);
         this.noodleThickness = config.noodleCaveThickness.get();
+        this.noodleToggleThreshold = config.noodleCaveToggleThreshold.get();
         this.spaghettiSpawnChance = clamp01(config.spaghettiCaveSpawnChance.get() / 100f);
         this.spaghettiThickness = config.spaghettiCaveThickness.get();
+        this.spaghettiRoughnessFrequency = config.spaghettiCaveRoughnessFrequency.get();
         this.canyonSpawnChance = clamp01(config.canyonSpawnChance.get() / 100f);
         this.canyonWidth = config.canyonWidth.get();
         this.canyonLavaBlock = getBlockFromString(config.lavaBlock.get(), Blocks.LAVA.getDefaultState());
@@ -87,18 +94,25 @@ public class ModernCaveCarverController {
 
         long seed = worldIn.getSeed();
         this.cheeseRegionNoise = new OpenSimplex2S(seed + 901);
-        this.cheeseShapeNoise = new OpenSimplex2S(seed + 902);
-        this.cheeseDetailNoise = new OpenSimplex2S(seed + 903);
-        this.cheeseWarpNoise = new OpenSimplex2S(seed + 904);
         this.spaghettiRegionNoise = new OpenSimplex2S(seed + 911);
-        this.spaghettiANoise = new OpenSimplex2S(seed + 912);
-        this.spaghettiBNoise = new OpenSimplex2S(seed + 913);
         this.spaghettiRoughnessNoise = new OpenSimplex2S(seed + 914);
         this.noodleRegionNoise = new OpenSimplex2S(seed + 921);
-        this.noodleANoise = new OpenSimplex2S(seed + 922);
-        this.noodleBNoise = new OpenSimplex2S(seed + 923);
-        this.noodleToggleNoise = new OpenSimplex2S(seed + 924);
         this.canyonWallNoise = new OpenSimplex2S(seed + 934);
+        this.cheeseSampler = createNoiseSampler(seed, 941, config.cheeseCaveNoiseFrequency.get(), cheeseNoiseThreshold,
+            config.cheeseCaveVerticalStretch.get(), config.cheeseCavePerturbAmp.get(), config.cheeseCavePerturbFrequency.get());
+        this.cheeseDetailSampler = createNoiseSampler(seed, 942, config.cheeseCaveDetailFrequency.get(), 0f,
+            config.cheeseCaveVerticalStretch.get() * 1.5f, config.cheeseCavePerturbAmp.get() * .3f,
+            config.cheeseCavePerturbFrequency.get() * 1.4f);
+        this.spaghettiASampler = createNoiseSampler(seed, 951, config.spaghettiCaveNoiseFrequency.get(), 0f,
+            config.spaghettiCaveVerticalStretch.get(), config.spaghettiCavePerturbAmp.get(), config.spaghettiCavePerturbFrequency.get());
+        this.spaghettiBSampler = createNoiseSampler(seed, 952, config.spaghettiCaveNoiseFrequency.get(), 0f,
+            config.spaghettiCaveVerticalStretch.get(), config.spaghettiCavePerturbAmp.get(), config.spaghettiCavePerturbFrequency.get());
+        this.noodleASampler = createNoiseSampler(seed, 961, config.noodleCaveNoiseFrequency.get(), 0f,
+            config.noodleCaveVerticalStretch.get(), config.noodleCavePerturbAmp.get(), config.noodleCavePerturbFrequency.get());
+        this.noodleBSampler = createNoiseSampler(seed, 962, config.noodleCaveNoiseFrequency.get(), 0f,
+            config.noodleCaveVerticalStretch.get(), config.noodleCavePerturbAmp.get(), config.noodleCavePerturbFrequency.get());
+        this.noodleToggleSampler = createNoiseSampler(seed, 963, config.noodleCaveToggleFrequency.get(), noodleToggleThreshold,
+            1f, 0f, 0f);
 
         if (config.modernCaveBottom.get() > config.modernCaveTop.get()) {
             BetterCaves.LOGGER.warn("Warning: Min altitude for modern caves should not be greater than max altitude. Values were swapped.");
@@ -184,15 +198,10 @@ public class ModernCaveCarverController {
             return false;
         }
 
-        double warpX = noise3(cheeseWarpNoise, x, y, z, .014) * 10.0;
-        double warpY = noise3(cheeseWarpNoise, x + 73, y - 31, z + 19, .014) * 5.0;
-        double warpZ = noise3(cheeseWarpNoise, x - 41, y + 17, z + 97, .014) * 10.0;
-        double broad = normalize(noise3(cheeseShapeNoise, x + warpX, y * .72 + warpY, z + warpZ, .017));
-        double pockets = 1.0 - Math.abs(noise3(cheeseDetailNoise, x + warpX * .35, y * .85 + warpY, z + warpZ * .35, .045));
-        double density = broad * .55 + pockets * .45;
-        double threshold = .46 + (1.0 - cheeseCaveSize) * .28 + (1.0 - fade) * .25;
+        double shape = cheeseSampler.sample(x, y, z) + cheeseDetailSampler.sample(x, y, z) * cheeseDetailWeight;
+        double threshold = cheeseNoiseThreshold + (cheeseCaveSize - .5) * .75 - (1.0 - fade) * .35;
 
-        return density > threshold;
+        return shape <= threshold;
     }
 
     private boolean shouldCarveSpaghetti(int x, int y, int z, int surfaceAltitude) {
@@ -205,12 +214,10 @@ public class ModernCaveCarverController {
             return false;
         }
 
-        double roughness = normalize(noise3(spaghettiRoughnessNoise, x, y, z, .075));
+        double roughness = normalize(noise3(spaghettiRoughnessNoise, x, y, z, spaghettiRoughnessFrequency));
         double thickness = spaghettiThickness * (.75 + roughness * .65) * fade;
-        double a = Math.abs(noise3(spaghettiANoise, x, y * .66, z, .038));
-        double b = Math.abs(noise3(spaghettiBNoise, x + 103, y * .66, z - 79, .038));
-
-        return Math.max(a, b) < thickness;
+        return spaghettiASampler.carveBand(x, y, z, thickness) &&
+            spaghettiBSampler.carveBand(x + 103, y, z - 79, thickness);
     }
 
     private boolean shouldCarveNoodle(int x, int y, int z, int surfaceAltitude) {
@@ -223,16 +230,14 @@ public class ModernCaveCarverController {
             return false;
         }
 
-        double toggle = noise3(noodleToggleNoise, x, y, z, .026);
-        if (toggle < -.18) {
+        double toggle = noodleToggleSampler.sample(x, y, z);
+        if (toggle < noodleToggleThreshold) {
             return false;
         }
 
         double thickness = noodleThickness * (.75 + normalize(toggle) * .5) * fade;
-        double a = Math.abs(noise3(noodleANoise, x, y, z, .086));
-        double b = Math.abs(noise3(noodleBNoise, x - 47, y + 23, z + 61, .086));
-
-        return Math.max(a, b) < thickness;
+        return noodleASampler.carveBand(x, y, z, thickness) &&
+            noodleBSampler.carveBand(x - 47, y + 23, z + 61, thickness);
     }
 
     private void carveCanyons(ChunkPrimer primer, int chunkX, int chunkZ, int[][] surfaceAltitudes) {
@@ -444,6 +449,12 @@ public class ModernCaveCarverController {
             return true;
         }
         return normalize(noise.noise2(x * frequency, z * frequency)) <= chance;
+    }
+
+    private static ProgrammableNoiseSampler createNoiseSampler(long seed, int seedOffset, float frequency, float threshold,
+                                                               float stretch, float perturbAmp, float perturbFrequency) {
+        return new ProgrammableNoiseSampler(seed + seedOffset, frequency, threshold, stretch,
+            1, .5, 2.0, perturbAmp, perturbFrequency, false);
     }
 
     private double noise3(OpenSimplex2S noise, double x, double y, double z, double frequency) {
