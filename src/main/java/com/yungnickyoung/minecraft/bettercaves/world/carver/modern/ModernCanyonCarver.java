@@ -4,14 +4,12 @@ import com.yungnickyoung.minecraft.bettercaves.api.BetterCavesAPI;
 import com.yungnickyoung.minecraft.bettercaves.api.ModernCaveCarvingType;
 import com.yungnickyoung.minecraft.bettercaves.config.util.ConfigHolder;
 import com.yungnickyoung.minecraft.bettercaves.noise.OpenSimplex2S;
-import com.yungnickyoung.minecraft.bettercaves.util.BetterCavesUtils;
 import com.yungnickyoung.minecraft.bettercaves.world.carver.CarverUtils;
 import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.init.Blocks;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
-import net.minecraft.world.chunk.ChunkPrimer;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -61,15 +59,15 @@ class ModernCanyonCarver {
         return enabled;
     }
 
-    void carveChunk(ChunkPrimer primer, int chunkX, int chunkZ, int[][] surfaceAltitudes, boolean hasApiCallbacks) {
-        int cellX = Math.floorDiv(chunkX, CANYON_CELL_CHUNKS);
-        int cellZ = Math.floorDiv(chunkZ, CANYON_CELL_CHUNKS);
+    void carveChunk(ModernCarvingContext context) {
+        int cellX = Math.floorDiv(context.chunkX, CANYON_CELL_CHUNKS);
+        int cellZ = Math.floorDiv(context.chunkZ, CANYON_CELL_CHUNKS);
 
         for (int searchX = cellX - CANYON_SEARCH_RADIUS; searchX <= cellX + CANYON_SEARCH_RADIUS; searchX++) {
             for (int searchZ = cellZ - CANYON_SEARCH_RADIUS; searchZ <= cellZ + CANYON_SEARCH_RADIUS; searchZ++) {
                 Canyon canyon = getCachedCanyon(searchX, searchZ);
                 if (canyon != null) {
-                    carveCanyon(primer, chunkX, chunkZ, surfaceAltitudes, canyon, hasApiCallbacks);
+                    carveCanyon(context, canyon);
                 }
             }
         }
@@ -116,16 +114,13 @@ class ModernCanyonCarver {
             height, canyonBottom, canyonBottom <= liquidAltitude + 8, ledgeOffset, random.nextDouble() * Math.PI * 2.0);
     }
 
-    private void carveCanyon(ChunkPrimer primer, int chunkX, int chunkZ, int[][] surfaceAltitudes, Canyon canyon,
-                             boolean hasApiCallbacks) {
+    private void carveCanyon(ModernCarvingContext context, Canyon canyon) {
         double yawX = Math.cos(canyon.yaw);
         double yawZ = Math.sin(canyon.yaw);
         double normalX = -yawZ;
         double normalZ = yawX;
-        int chunkBlockX = chunkX * 16;
-        int chunkBlockZ = chunkZ * 16;
         BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
-        if (!canyonTouchesChunk(canyon, chunkBlockX, chunkBlockZ)) {
+        if (!canyonTouchesChunk(canyon, context.chunkBlockX, context.chunkBlockZ)) {
             return;
         }
 
@@ -136,20 +131,20 @@ class ModernCanyonCarver {
             double centerX = canyon.originX + yawX * centeredStep + normalX * curve;
             double centerZ = canyon.originZ + yawZ * centeredStep + normalZ * curve;
             double stepWidth = canyon.width * (.78 + Math.sin(progress * Math.PI) * .35);
-            if (centerX + stepWidth + 2.0 < chunkBlockX || centerX - stepWidth - 2.0 > chunkBlockX + 15 ||
-                centerZ + stepWidth + 2.0 < chunkBlockZ || centerZ - stepWidth - 2.0 > chunkBlockZ + 15) {
+            if (centerX + stepWidth + 2.0 < context.chunkBlockX || centerX - stepWidth - 2.0 > context.chunkBlockX + 15 ||
+                centerZ + stepWidth + 2.0 < context.chunkBlockZ || centerZ - stepWidth - 2.0 > context.chunkBlockZ + 15) {
                 continue;
             }
 
-            int minLocalX = clamp((int)Math.floor(centerX - stepWidth - 2.0) - chunkBlockX, 0, 15);
-            int maxLocalX = clamp((int)Math.floor(centerX + stepWidth + 2.0) - chunkBlockX, 0, 15);
-            int minLocalZ = clamp((int)Math.floor(centerZ - stepWidth - 2.0) - chunkBlockZ, 0, 15);
-            int maxLocalZ = clamp((int)Math.floor(centerZ + stepWidth + 2.0) - chunkBlockZ, 0, 15);
+            int minLocalX = clamp((int)Math.floor(centerX - stepWidth - 2.0) - context.chunkBlockX, 0, 15);
+            int maxLocalX = clamp((int)Math.floor(centerX + stepWidth + 2.0) - context.chunkBlockX, 0, 15);
+            int minLocalZ = clamp((int)Math.floor(centerZ - stepWidth - 2.0) - context.chunkBlockZ, 0, 15);
+            int maxLocalZ = clamp((int)Math.floor(centerZ + stepWidth + 2.0) - context.chunkBlockZ, 0, 15);
 
             for (int localX = minLocalX; localX <= maxLocalX; localX++) {
-                int blockX = chunkBlockX + localX;
+                int blockX = context.blockX(localX);
                 for (int localZ = minLocalZ; localZ <= maxLocalZ; localZ++) {
-                    int blockZ = chunkBlockZ + localZ;
+                    int blockZ = context.blockZ(localZ);
                     double dx = blockX + .5 - centerX;
                     double dz = blockZ + .5 - centerZ;
                     double radial = Math.sqrt(dx * dx + dz * dz) / stepWidth;
@@ -157,7 +152,7 @@ class ModernCanyonCarver {
                         continue;
                     }
 
-                    int surfaceAltitude = surfaceAltitudes[localX][localZ];
+                    int surfaceAltitude = context.surfaceAltitude(localX, localZ);
                     int yTop = getCanyonTopY(canyon, surfaceAltitude);
                     int yBottom = getCanyonBottomY(canyon);
                     if (yTop <= yBottom) {
@@ -168,7 +163,7 @@ class ModernCanyonCarver {
                         if (!shouldCarveCanyonBlock(canyon, radial, y, yTop, yBottom, blockX, blockZ, progress)) {
                             continue;
                         }
-                        carveCanyonBlock(primer, blockX, y, blockZ, canyon, mutableBlockPos, hasApiCallbacks);
+                        carveCanyonBlock(context, blockX, y, blockZ, canyon, mutableBlockPos);
                     }
                 }
             }
@@ -236,26 +231,27 @@ class ModernCanyonCarver {
         return ledgeNoise > .38;
     }
 
-    private void carveCanyonBlock(ChunkPrimer primer, int x, int y, int z, Canyon canyon,
-                                  BlockPos.MutableBlockPos mutableBlockPos, boolean hasApiCallbacks) {
+    private void carveCanyonBlock(ModernCarvingContext context, int x, int y, int z, Canyon canyon,
+                                  BlockPos.MutableBlockPos mutableBlockPos) {
         mutableBlockPos.setPos(x, y, z);
         if (debugVisualizerEnabled) {
-            CarverUtils.debugDigBlock(primer, mutableBlockPos, CANYON_DEBUG_BLOCK, true);
+            CarverUtils.debugDigBlock(context.primer, mutableBlockPos, CANYON_DEBUG_BLOCK, true);
             return;
         }
 
         int lavaLevel = canyon.hasLavaLake ? canyon.bottomY + 2 : liquidAltitude;
-        if (!hasApiCallbacks) {
-            CarverUtils.digBlock(world, primer, mutableBlockPos, Blocks.AIR.getDefaultState(), canyonLavaBlock, lavaLevel, replaceFloatingGravel);
+        if (!context.hasApiCallbacks) {
+            CarverUtils.digBlock(world, context.primer, mutableBlockPos, Blocks.AIR.getDefaultState(), canyonLavaBlock,
+                lavaLevel, replaceFloatingGravel);
             return;
         }
 
         BlockPos blockPos = new BlockPos(x, y, z);
-        IBlockState currentState = primer.getBlockState(BetterCavesUtils.getLocal(x), y, BetterCavesUtils.getLocal(z));
+        IBlockState currentState = context.primer.getBlockState(context.localX(x), y, context.localZ(z));
         IBlockState proposedState = y <= lavaLevel ? canyonLavaBlock : Blocks.AIR.getDefaultState();
         IBlockState carveState = BetterCavesAPI.resolveModernCaveCarvedBlock(world, blockPos, currentState,
             proposedState, ModernCaveCarvingType.CANYON);
-        CarverUtils.digBlock(world, primer, blockPos, carveState, null, -1, replaceFloatingGravel);
+        CarverUtils.digBlock(world, context.primer, blockPos, carveState, null, -1, replaceFloatingGravel);
     }
 
     private double noise3(OpenSimplex2S noise, double x, double y, double z, double frequency) {

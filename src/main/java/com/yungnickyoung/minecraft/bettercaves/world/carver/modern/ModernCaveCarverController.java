@@ -15,6 +15,7 @@ public class ModernCaveCarverController {
     private final AquiferSampler aquiferSampler;
     private final ModernNoiseCaveCarver[] noiseCarvers;
     private final ModernCanyonCarver canyonCarver;
+    private final ModernCarvedPositionBuffer carvedPositions = new ModernCarvedPositionBuffer();
 
     private final boolean enabled;
     private final boolean debugVisualizerEnabled;
@@ -58,19 +59,28 @@ public class ModernCaveCarverController {
         }
 
         boolean hasApiCallbacks = BetterCavesAPI.hasModernCaveCarvingCallbacks();
+        ModernCarvingContext context = new ModernCarvingContext(world, primer, chunkX, chunkZ,
+            surfaceAltitudes, liquidBlocks, hasApiCallbacks);
+
         if (canyonCarver.isEnabled()) {
-            canyonCarver.carveChunk(primer, chunkX, chunkZ, surfaceAltitudes, hasApiCallbacks);
+            canyonCarver.carveChunk(context);
         }
 
         if (!noiseCavesEnabled) {
             return;
         }
 
+        carvedPositions.reset();
+        collectNoiseCavePositions(context, carvedPositions);
+        carveNoiseCavePositions(context, carvedPositions);
+    }
+
+    private void collectNoiseCavePositions(ModernCarvingContext context, ModernCarvedPositionBuffer positions) {
         for (int localX = 0; localX < 16; localX++) {
-            int blockX = chunkX * 16 + localX;
+            int blockX = context.blockX(localX);
             for (int localZ = 0; localZ < 16; localZ++) {
-                int blockZ = chunkZ * 16 + localZ;
-                int surfaceAltitude = surfaceAltitudes[localX][localZ];
+                int blockZ = context.blockZ(localZ);
+                int surfaceAltitude = context.surfaceAltitude(localX, localZ);
                 int columnTopY = overrideSurfaceDetection || debugVisualizerEnabled
                     ? topY
                     : Math.min(surfaceAltitude, topY);
@@ -84,12 +94,8 @@ public class ModernCaveCarverController {
                     continue;
                 }
 
-                IBlockState fallbackLiquidBlock = liquidBlocks[localX][localZ];
-                AquiferSampler.ColumnSample aquiferColumnSample = aquiferSampler.sampleColumn(blockX, blockZ, surfaceAltitude);
-                BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
-
                 for (int y = columnTopY; y >= bottomY; y--) {
-                    IBlockState currentState = primer.getBlockState(localX, y, localZ);
+                    IBlockState currentState = context.primer.getBlockState(localX, y, localZ);
                     Material currentMaterial = currentState.getMaterial();
                     if (currentMaterial == Material.AIR || currentMaterial == Material.WATER || currentMaterial == Material.LAVA) {
                         continue;
@@ -100,40 +106,63 @@ public class ModernCaveCarverController {
                         continue;
                     }
 
-                    ModernNoiseCaveCarver carver = getCarverForBlock(columnCarveMask, blockX, y, blockZ, fade);
-                    if (carver == null) {
-                        continue;
-                    }
-
-                    AquiferSampler.Sample aquiferSample = aquiferSampler.sample(blockX, y, blockZ, surfaceAltitude,
-                        fallbackLiquidBlock, aquiferColumnSample);
-                    if (aquiferSample.isBlocked()) {
-                        continue;
-                    }
-                    if (aquiferSample.getBlockState().getMaterial() == Material.WATER &&
-                        isUnsafeAquiferWaterPlacement(primer, localX, y, localZ)) {
-                        continue;
-                    }
-
-                    if (debugVisualizerEnabled) {
-                        mutableBlockPos.setPos(blockX, y, blockZ);
-                        CarverUtils.debugDigBlock(primer, mutableBlockPos, carver.getDebugBlock(), true);
-                    }
-                    else {
-                        IBlockState carveState = aquiferSample.getBlockState();
-                        if (hasApiCallbacks) {
-                            BlockPos blockPos = new BlockPos(blockX, y, blockZ);
-                            carveState = BetterCavesAPI.resolveModernCaveCarvedBlock(world, blockPos,
-                                currentState, carveState, carver.getType());
-                            CarverUtils.digBlock(world, primer, blockPos, carveState, null, -1, replaceFloatingGravel);
-                        }
-                        else {
-                            mutableBlockPos.setPos(blockX, y, blockZ);
-                            CarverUtils.digBlock(world, primer, mutableBlockPos, carveState, null, -1, replaceFloatingGravel);
-                        }
+                    int carverIndex = getCarverIndexForBlock(columnCarveMask, blockX, y, blockZ, fade);
+                    if (carverIndex >= 0) {
+                        positions.add(localX, y, localZ, carverIndex);
                     }
                 }
             }
+        }
+    }
+
+    private void carveNoiseCavePositions(final ModernCarvingContext context, ModernCarvedPositionBuffer positions) {
+        positions.forEach(new ModernCarvedPositionBuffer.PositionConsumer() {
+            @Override
+            public void accept(int localX, int y, int localZ, int carverIndex) {
+                carveNoiseCavePosition(context, localX, y, localZ, noiseCarvers[carverIndex]);
+            }
+        });
+    }
+
+    private void carveNoiseCavePosition(ModernCarvingContext context, int localX, int y, int localZ,
+                                        ModernNoiseCaveCarver carver) {
+        IBlockState currentState = context.primer.getBlockState(localX, y, localZ);
+        Material currentMaterial = currentState.getMaterial();
+        if (currentMaterial == Material.AIR || currentMaterial == Material.WATER || currentMaterial == Material.LAVA) {
+            return;
+        }
+
+        int blockX = context.blockX(localX);
+        int blockZ = context.blockZ(localZ);
+        int surfaceAltitude = context.surfaceAltitude(localX, localZ);
+        AquiferSampler.ColumnSample aquiferColumnSample = context.aquiferColumnSample(aquiferSampler, localX, localZ);
+        AquiferSampler.Sample aquiferSample = aquiferSampler.sample(blockX, y, blockZ, surfaceAltitude,
+            context.fallbackLiquidBlock(localX, localZ), aquiferColumnSample);
+        if (aquiferSample.isBlocked()) {
+            return;
+        }
+        if (aquiferSample.getBlockState().getMaterial() == Material.WATER &&
+            isUnsafeAquiferWaterPlacement(context.primer, localX, y, localZ, aquiferColumnSample)) {
+            return;
+        }
+
+        if (debugVisualizerEnabled) {
+            context.mutableBlockPos.setPos(blockX, y, blockZ);
+            CarverUtils.debugDigBlock(context.primer, context.mutableBlockPos, carver.getDebugBlock(), true);
+            return;
+        }
+
+        IBlockState carveState = aquiferSample.getBlockState();
+        if (context.hasApiCallbacks) {
+            BlockPos blockPos = new BlockPos(blockX, y, blockZ);
+            carveState = BetterCavesAPI.resolveModernCaveCarvedBlock(context.world, blockPos,
+                currentState, carveState, carver.getType());
+            CarverUtils.digBlock(context.world, context.primer, blockPos, carveState, null, -1, replaceFloatingGravel);
+        }
+        else {
+            context.mutableBlockPos.setPos(blockX, y, blockZ);
+            CarverUtils.digBlock(context.world, context.primer, context.mutableBlockPos, carveState, null, -1,
+                replaceFloatingGravel);
         }
     }
 
@@ -147,17 +176,28 @@ public class ModernCaveCarverController {
         return mask;
     }
 
-    private ModernNoiseCaveCarver getCarverForBlock(int columnCarveMask, int x, int y, int z, float fade) {
-        for (ModernNoiseCaveCarver carver : noiseCarvers) {
+    private int getCarverIndexForBlock(int columnCarveMask, int x, int y, int z, float fade) {
+        for (int i = 0; i < noiseCarvers.length; i++) {
+            ModernNoiseCaveCarver carver = noiseCarvers[i];
             if ((columnCarveMask & carver.getColumnMask()) != 0 && carver.shouldCarve(x, y, z, fade)) {
-                return carver;
+                return i;
             }
         }
-        return null;
+        return -1;
     }
 
-    private boolean isUnsafeAquiferWaterPlacement(ChunkPrimer primer, int localX, int y, int localZ) {
+    private boolean isUnsafeAquiferWaterPlacement(ChunkPrimer primer, int localX, int y, int localZ,
+                                                  AquiferSampler.ColumnSample columnSample) {
         if (y <= liquidAltitude + 6) {
+            return true;
+        }
+
+        Material aboveMaterial = primer.getBlockState(localX, y + 1, localZ).getMaterial();
+        if (aboveMaterial == Material.LAVA) {
+            return true;
+        }
+        if (columnSample != null && columnSample.hasWater() && y < columnSample.getWaterLevel() &&
+            aboveMaterial == Material.AIR) {
             return true;
         }
 

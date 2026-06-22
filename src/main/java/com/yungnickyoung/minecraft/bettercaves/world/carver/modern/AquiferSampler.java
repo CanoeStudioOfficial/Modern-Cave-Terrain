@@ -11,6 +11,10 @@ import net.minecraft.world.World;
 
 public class AquiferSampler {
     private static final IBlockState AIR = Blocks.AIR.getDefaultState();
+    private static final int MIN_SURFACE_CLEARANCE = 12;
+    private static final int MIN_WATER_DEPTH = 7;
+    private static final int MAX_WATER_DEPTH = 22;
+    private static final int FLOOR_BARRIER_DEPTH = 2;
 
     private final boolean enabled;
     private final int aquiferBottom;
@@ -22,6 +26,7 @@ public class AquiferSampler {
     private final IBlockState lavaBlock;
     private final IBlockState waterBlock;
     private final FastNoise waterLevelNoise;
+    private final FastNoise waterDepthNoise;
     private final FastNoise waterRegionNoise;
     private final FastNoise barrierNoise;
 
@@ -42,6 +47,12 @@ public class AquiferSampler {
         this.waterLevelNoise.SetFractalOctaves(2);
         this.waterLevelNoise.SetFrequency(.018f);
 
+        this.waterDepthNoise = new FastNoise();
+        this.waterDepthNoise.SetSeed((int)world.getSeed() + 884);
+        this.waterDepthNoise.SetNoiseType(FastNoise.NoiseType.SimplexFractal);
+        this.waterDepthNoise.SetFractalOctaves(2);
+        this.waterDepthNoise.SetFrequency(.012f);
+
         this.waterRegionNoise = new FastNoise();
         this.waterRegionNoise.SetSeed((int)world.getSeed() + 882);
         this.waterRegionNoise.SetNoiseType(FastNoise.NoiseType.SimplexFractal);
@@ -61,12 +72,17 @@ public class AquiferSampler {
         }
 
         int waterLevel = getWaterLevel(x, z, surfaceAltitude);
+        if (surfaceAltitude > aquiferBottom && surfaceAltitude - waterLevel < MIN_SURFACE_CLEARANCE) {
+            return ColumnSample.dry();
+        }
+
+        int waterBottom = getWaterBottom(x, z, waterLevel);
         boolean nearbyLevelShift =
             Math.abs(waterLevel - getWaterLevel(x + 16, z, surfaceAltitude)) > 10 ||
             Math.abs(waterLevel - getWaterLevel(x - 16, z, surfaceAltitude)) > 10 ||
             Math.abs(waterLevel - getWaterLevel(x, z + 16, surfaceAltitude)) > 10 ||
             Math.abs(waterLevel - getWaterLevel(x, z - 16, surfaceAltitude)) > 10;
-        return new ColumnSample(true, waterLevel, nearbyLevelShift);
+        return new ColumnSample(true, waterLevel, waterBottom, nearbyLevelShift);
     }
 
     public Sample sample(int x, int y, int z, int surfaceAltitude, IBlockState fallbackLiquidBlock) {
@@ -98,6 +114,13 @@ public class AquiferSampler {
             return Sample.air();
         }
 
+        if (y < columnSample.getWaterBottom()) {
+            if (columnSample.getWaterBottom() - y <= FLOOR_BARRIER_DEPTH) {
+                return Sample.blocked();
+            }
+            return Sample.air();
+        }
+
         if (shouldPreserveBarrier(x, y, z, columnSample)) {
             return Sample.blocked();
         }
@@ -112,11 +135,19 @@ public class AquiferSampler {
     private int getWaterLevel(int x, int z, int surfaceAltitude) {
         int levelRange = Math.max(0, waterLevelMax - waterLevelMin);
         int level = waterLevelMin + Math.round(normalize(waterLevelNoise.GetNoise(x, z)) * levelRange);
-        int ceiling = surfaceAltitude > aquiferBottom ? Math.min(aquiferTop, surfaceAltitude - 4) : aquiferTop;
+        int ceiling = surfaceAltitude > aquiferBottom
+            ? Math.min(aquiferTop, surfaceAltitude - MIN_SURFACE_CLEARANCE)
+            : aquiferTop;
         if (ceiling < aquiferBottom) {
             ceiling = aquiferBottom;
         }
         return clamp(level, aquiferBottom, ceiling);
+    }
+
+    private int getWaterBottom(int x, int z, int waterLevel) {
+        int depthRange = MAX_WATER_DEPTH - MIN_WATER_DEPTH;
+        int depth = MIN_WATER_DEPTH + Math.round(normalize(waterDepthNoise.GetNoise(x, z)) * depthRange);
+        return clamp(waterLevel - depth, aquiferBottom, waterLevel);
     }
 
     private boolean shouldPreserveBarrier(int x, int y, int z, ColumnSample columnSample) {
@@ -175,15 +206,17 @@ public class AquiferSampler {
     }
 
     public static class ColumnSample {
-        private static final ColumnSample DRY = new ColumnSample(false, 0, false);
+        private static final ColumnSample DRY = new ColumnSample(false, 0, 0, false);
 
         private final boolean water;
         private final int waterLevel;
+        private final int waterBottom;
         private final boolean nearbyLevelShift;
 
-        private ColumnSample(boolean water, int waterLevel, boolean nearbyLevelShift) {
+        private ColumnSample(boolean water, int waterLevel, int waterBottom, boolean nearbyLevelShift) {
             this.water = water;
             this.waterLevel = waterLevel;
+            this.waterBottom = waterBottom;
             this.nearbyLevelShift = nearbyLevelShift;
         }
 
@@ -197,6 +230,10 @@ public class AquiferSampler {
 
         public int getWaterLevel() {
             return waterLevel;
+        }
+
+        public int getWaterBottom() {
+            return waterBottom;
         }
 
         public boolean hasNearbyLevelShift() {
