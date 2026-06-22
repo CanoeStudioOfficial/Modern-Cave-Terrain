@@ -15,11 +15,14 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.ChunkPrimer;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Random;
 
 public class ModernCaveCarverController {
     private static final int CANYON_CELL_CHUNKS = 8;
     private static final int CANYON_SEARCH_RADIUS = 2;
+    private static final int CANYON_CACHE_SIZE = 4096;
     private static final int CHEESE_COLUMN_MASK = 1;
     private static final int SPAGHETTI_COLUMN_MASK = 1 << 1;
     private static final int NOODLE_COLUMN_MASK = 1 << 2;
@@ -69,6 +72,12 @@ public class ModernCaveCarverController {
     private final ProgrammableNoiseSampler noodleASampler;
     private final ProgrammableNoiseSampler noodleBSampler;
     private final ProgrammableNoiseSampler noodleToggleSampler;
+    private final Map<Long, Canyon> canyonCache = new LinkedHashMap<Long, Canyon>(CANYON_CACHE_SIZE, .75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<Long, Canyon> eldest) {
+            return size() > CANYON_CACHE_SIZE;
+        }
+    };
 
     public ModernCaveCarverController(World worldIn, ConfigHolder config) {
         this.world = worldIn;
@@ -288,12 +297,23 @@ public class ModernCaveCarverController {
 
         for (int searchX = cellX - CANYON_SEARCH_RADIUS; searchX <= cellX + CANYON_SEARCH_RADIUS; searchX++) {
             for (int searchZ = cellZ - CANYON_SEARCH_RADIUS; searchZ <= cellZ + CANYON_SEARCH_RADIUS; searchZ++) {
-                Canyon canyon = createCanyon(searchX, searchZ);
+                Canyon canyon = getCachedCanyon(searchX, searchZ);
                 if (canyon != null) {
                     carveCanyon(primer, chunkX, chunkZ, surfaceAltitudes, canyon, hasApiCallbacks);
                 }
             }
         }
+    }
+
+    private Canyon getCachedCanyon(int cellX, int cellZ) {
+        long cacheKey = canyonCacheKey(cellX, cellZ);
+        if (canyonCache.containsKey(cacheKey)) {
+            return canyonCache.get(cacheKey);
+        }
+
+        Canyon canyon = createCanyon(cellX, cellZ);
+        canyonCache.put(cacheKey, canyon);
+        return canyon;
     }
 
     private Canyon createCanyon(int cellX, int cellZ) {
@@ -335,6 +355,9 @@ public class ModernCaveCarverController {
         int chunkBlockX = chunkX * 16;
         int chunkBlockZ = chunkZ * 16;
         BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
+        if (!canyonTouchesChunk(canyon, chunkBlockX, chunkBlockZ)) {
+            return;
+        }
 
         for (int step = 0; step < canyon.length; step += 2) {
             double progress = canyon.length <= 1 ? 0.0 : (double)step / (double)(canyon.length - 1);
@@ -380,6 +403,19 @@ public class ModernCaveCarverController {
                 }
             }
         }
+    }
+
+    private boolean canyonTouchesChunk(Canyon canyon, int chunkBlockX, int chunkBlockZ) {
+        double halfLength = canyon.length * .5;
+        double yawX = Math.cos(canyon.yaw);
+        double yawZ = Math.sin(canyon.yaw);
+        double normalX = -yawZ;
+        double normalZ = yawX;
+        double xReach = Math.abs(yawX) * halfLength + Math.abs(normalX) * canyon.curveAmplitude + canyon.width + 3.0;
+        double zReach = Math.abs(yawZ) * halfLength + Math.abs(normalZ) * canyon.curveAmplitude + canyon.width + 3.0;
+
+        return canyon.originX + xReach >= chunkBlockX && canyon.originX - xReach <= chunkBlockX + 15 &&
+            canyon.originZ + zReach >= chunkBlockZ && canyon.originZ - zReach <= chunkBlockZ + 15;
     }
 
     private int getCanyonTopY(Canyon canyon, int surfaceAltitude) {
@@ -535,6 +571,10 @@ public class ModernCaveCarverController {
         mixed = mixed * 6364136223846793005L + 1442695040888963407L;
         mixed ^= mixed >>> 33;
         return mixed;
+    }
+
+    private static long canyonCacheKey(int cellX, int cellZ) {
+        return ((long)cellX << 32) ^ (cellZ & 0xffffffffL);
     }
 
     private static int positiveMod(int value, int divisor) {
