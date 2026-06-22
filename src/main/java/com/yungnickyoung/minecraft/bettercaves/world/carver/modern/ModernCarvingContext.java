@@ -16,7 +16,6 @@ class ModernCarvingContext {
 
     private final int[][] surfaceAltitudes;
     private final IBlockState[][] liquidBlocks;
-    private final AquiferSampler.ColumnSample[] aquiferColumnSamples = new AquiferSampler.ColumnSample[16 * 16];
     final BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 
     ModernCarvingContext(World world, ChunkPrimer primer, int chunkX, int chunkZ, int[][] surfaceAltitudes,
@@ -54,15 +53,5 @@ class ModernCarvingContext {
 
     IBlockState fallbackLiquidBlock(int localX, int localZ) {
         return liquidBlocks[localX][localZ];
-    }
-
-    AquiferSampler.ColumnSample aquiferColumnSample(AquiferSampler aquiferSampler, int localX, int localZ) {
-        int index = localX << 4 | localZ;
-        AquiferSampler.ColumnSample sample = aquiferColumnSamples[index];
-        if (sample == null) {
-            sample = aquiferSampler.sampleColumn(blockX(localX), blockZ(localZ), surfaceAltitude(localX, localZ));
-            aquiferColumnSamples[index] = sample;
-        }
-        return sample;
     }
 }

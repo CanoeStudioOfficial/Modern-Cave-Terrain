@@ -6,7 +6,7 @@ public class ConfigModernCaves {
     @Config.Name("Enable Modern Caves")
     @Config.Comment(
         "Set to true to enable 1.18+ style noise caves.\n" +
-            "This adds cheese caves, noodle caves, spaghetti caves, canyons, and aquifers.\n" +
+            "This adds cheese caves, noodle caves, spaghetti caves, and canyons.\n" +
             "Default: true")
     @Config.RequiresWorldRestart
     public boolean enableModernCaves = true;
@@ -42,10 +42,6 @@ public class ConfigModernCaves {
     @Config.Name("Canyons")
     @Config.Comment("Settings for giant vertical fissure carving.")
     public Canyons canyons = new Canyons();
-
-    @Config.Name("Aquifers")
-    @Config.Comment("Settings for local 1.18-style underground water bodies.")
-    public Aquifers aquifers = new Aquifers();
 
     public static class CheeseCaves {
         @Config.Name("Enable Cheese Caves")
@@ -283,52 +279,4 @@ public class ConfigModernCaves {
         public float width = .052f;
     }
 
-    public static class Aquifers {
-        @Config.Name("Enable Aquifers")
-        @Config.Comment(
-            "Set to true to use local water levels for modern caves.\n" +
-                "Default: true")
-        @Config.RequiresWorldRestart
-        public boolean enableAquifers = true;
-
-        @Config.Name("Aquifer Minimum Altitude")
-        @Config.Comment(
-            "The minimum y-coordinate at which aquifers can place water.\n" +
-                "Default: 18")
-        @Config.RangeInt(min = 0, max = 255)
-        @Config.RequiresWorldRestart
-        public int aquiferBottom = 18;
-
-        @Config.Name("Aquifer Maximum Altitude")
-        @Config.Comment(
-            "The maximum y-coordinate at which aquifers can place water.\n" +
-                "Default: 62")
-        @Config.RangeInt(min = 0, max = 255)
-        @Config.RequiresWorldRestart
-        public int aquiferTop = 62;
-
-        @Config.Name("Aquifer Water Level Min")
-        @Config.Comment(
-            "Minimum local water level used by aquifers.\n" +
-                "Default: 18")
-        @Config.RangeInt(min = 0, max = 255)
-        @Config.RequiresWorldRestart
-        public int waterLevelMin = 18;
-
-        @Config.Name("Aquifer Water Level Max")
-        @Config.Comment(
-            "Maximum local water level used by aquifers.\n" +
-                "Default: 56")
-        @Config.RangeInt(min = 0, max = 255)
-        @Config.RequiresWorldRestart
-        public int waterLevelMax = 56;
-
-        @Config.Name("Aquifer Water Chance")
-        @Config.Comment(
-            "Percent chance for local aquifer cells to contain water.\n" +
-                "Default: 35")
-        @Config.RangeDouble(min = 0, max = 100)
-        @Config.RequiresWorldRestart
-        public float waterChance = 35;
-    }
 }

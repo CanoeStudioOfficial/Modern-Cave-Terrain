@@ -253,25 +253,6 @@ public class ConfigHolder {
             .setCategory("general.underground generation.modern caves.canyons")
             .addToMap(properties);
 
-        enableAquifers = new ConfigOption<>("Enable Aquifers", Configuration.caveSettings.modernCaves.aquifers.enableAquifers)
-            .setCategory("general.underground generation.modern caves.aquifers")
-            .addToMap(properties);
-        aquiferBottom = new ConfigOption<>("Aquifer Minimum Altitude", Configuration.caveSettings.modernCaves.aquifers.aquiferBottom)
-            .setCategory("general.underground generation.modern caves.aquifers")
-            .addToMap(properties);
-        aquiferTop = new ConfigOption<>("Aquifer Maximum Altitude", Configuration.caveSettings.modernCaves.aquifers.aquiferTop)
-            .setCategory("general.underground generation.modern caves.aquifers")
-            .addToMap(properties);
-        aquiferWaterLevelMin = new ConfigOption<>("Aquifer Water Level Min", Configuration.caveSettings.modernCaves.aquifers.waterLevelMin)
-            .setCategory("general.underground generation.modern caves.aquifers")
-            .addToMap(properties);
-        aquiferWaterLevelMax = new ConfigOption<>("Aquifer Water Level Max", Configuration.caveSettings.modernCaves.aquifers.waterLevelMax)
-            .setCategory("general.underground generation.modern caves.aquifers")
-            .addToMap(properties);
-        aquiferWaterChance = new ConfigOption<>("Aquifer Water Chance", Configuration.caveSettings.modernCaves.aquifers.waterChance)
-            .setCategory("general.underground generation.modern caves.aquifers")
-            .addToMap(properties);
-
         // Water region settings
         waterRegionSpawnChance = new ConfigOption<>("Water Region Spawn Chance", Configuration.caveSettings.waterRegions.waterRegionSpawnChance)
             .setCategory("general.underground generation.water regions")
@@ -548,13 +529,6 @@ public class ConfigHolder {
     public ConfigOption<Boolean> enableModernCanyons;
     public ConfigOption<Float>   canyonSpawnChance;
     public ConfigOption<Float>   canyonWidth;
-
-    public ConfigOption<Boolean> enableAquifers;
-    public ConfigOption<Integer> aquiferBottom;
-    public ConfigOption<Integer> aquiferTop;
-    public ConfigOption<Integer> aquiferWaterLevelMin;
-    public ConfigOption<Integer> aquiferWaterLevelMax;
-    public ConfigOption<Float>   aquiferWaterChance;
 
     // Water region settings
     public ConfigOption<Float>      waterRegionSpawnChance;

@@ -6,6 +6,7 @@ import com.yungnickyoung.minecraft.bettercaves.config.util.ConfigHolder;
 import com.yungnickyoung.minecraft.bettercaves.noise.OpenSimplex2S;
 import com.yungnickyoung.minecraft.bettercaves.world.carver.CarverUtils;
 import net.minecraft.block.Block;
+import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.init.Blocks;
 import net.minecraft.util.math.BlockPos;
@@ -16,9 +17,10 @@ import java.util.Map;
 import java.util.Random;
 
 class ModernCanyonCarver {
-    private static final int CANYON_CELL_CHUNKS = 8;
+    private static final int CANYON_CELL_CHUNKS = 10;
     private static final int CANYON_SEARCH_RADIUS = 2;
     private static final int CANYON_CACHE_SIZE = 4096;
+    private static final float SURFACE_CANYON_CHANCE = .22f;
     private static final IBlockState CANYON_DEBUG_BLOCK = Blocks.DIAMOND_BLOCK.getDefaultState();
 
     private final World world;
@@ -92,23 +94,24 @@ class ModernCanyonCarver {
 
         int cellSizeBlocks = CANYON_CELL_CHUNKS * 16;
         float widthScale = clamp(canyonWidth / .052f, .35f, 2.5f);
-        boolean surface = random.nextFloat() < .45f;
+        boolean surface = random.nextFloat() < SURFACE_CANYON_CHANCE;
         double originX = cellX * cellSizeBlocks + random.nextInt(cellSizeBlocks);
         double originZ = cellZ * cellSizeBlocks + random.nextInt(cellSizeBlocks);
         double yaw = random.nextDouble() * Math.PI * 2.0;
-        int length = surface ? 96 + random.nextInt(96) : 80 + random.nextInt(112);
-        double width = (surface ? 4.5 + random.nextDouble() * 4.5 : 3.5 + random.nextDouble() * 3.5) * widthScale;
-        double curveAmplitude = (10.0 + random.nextDouble() * 22.0) * widthScale;
+        int length = surface ? 72 + random.nextInt(72) : 88 + random.nextInt(104);
+        double width = (surface ? 2.75 + random.nextDouble() * 3.0 : 2.5 + random.nextDouble() * 3.0) * widthScale;
+        double curveAmplitude = (8.0 + random.nextDouble() * 18.0) * widthScale;
         int ledgeOffset = random.nextInt(11);
 
         if (surface) {
-            int canyonBottom = 4 + random.nextInt(18);
+            int height = 34 + random.nextInt(28);
+            int canyonBottom = Math.max(4, liquidAltitude - 3 + random.nextInt(9));
             return new Canyon(surface, originX, originZ, yaw, length, width, curveAmplitude, 0,
-                0, canyonBottom, canyonBottom <= liquidAltitude + 8, ledgeOffset, random.nextDouble() * Math.PI * 2.0);
+                height, canyonBottom, canyonBottom <= liquidAltitude + 8, ledgeOffset, random.nextDouble() * Math.PI * 2.0);
         }
 
-        int centerY = 28 + random.nextInt(42);
-        int height = 34 + random.nextInt(46);
+        int centerY = 26 + random.nextInt(40);
+        int height = 36 + random.nextInt(40);
         int canyonBottom = Math.max(3, centerY - height / 2);
         return new Canyon(surface, originX, originZ, yaw, length, width, curveAmplitude, centerY,
             height, canyonBottom, canyonBottom <= liquidAltitude + 8, ledgeOffset, random.nextDouble() * Math.PI * 2.0);
@@ -154,7 +157,7 @@ class ModernCanyonCarver {
 
                     int surfaceAltitude = context.surfaceAltitude(localX, localZ);
                     int yTop = getCanyonTopY(canyon, surfaceAltitude);
-                    int yBottom = getCanyonBottomY(canyon);
+                    int yBottom = getCanyonBottomY(canyon, yTop);
                     if (yTop <= yBottom) {
                         continue;
                     }
@@ -187,7 +190,7 @@ class ModernCanyonCarver {
         if (canyon.surface) {
             return overrideSurfaceDetection || debugVisualizerEnabled
                 ? topY
-                : clamp(surfaceAltitude + 2, 1, 254);
+                : clamp(Math.min(surfaceAltitude + 2, topY), bottomY, 254);
         }
 
         int top = clamp(canyon.centerY + canyon.height / 2, bottomY, topY);
@@ -197,9 +200,9 @@ class ModernCanyonCarver {
         return clamp(top, 1, 254);
     }
 
-    private int getCanyonBottomY(Canyon canyon) {
+    private int getCanyonBottomY(Canyon canyon, int top) {
         if (canyon.surface) {
-            return clamp(canyon.bottomY, bottomY, topY);
+            return clamp(Math.max(canyon.bottomY, top - canyon.height), bottomY, topY);
         }
         return clamp(canyon.centerY - canyon.height / 2, bottomY, topY);
     }
@@ -207,28 +210,35 @@ class ModernCanyonCarver {
     private boolean shouldCarveCanyonBlock(Canyon canyon, double radial, int y, int top, int bottom, int x, int z, double progress) {
         int span = Math.max(1, top - bottom);
         double depth = (double)(top - y) / (double)span;
-        double widthAtY = canyon.surface
-            ? .72 + Math.sin(depth * Math.PI) * .43
-            : Math.sin(depth * Math.PI);
+        double widthAtY;
+        if (canyon.surface) {
+            double middleBulge = Math.sin(depth * Math.PI);
+            double bottomTaper = depth > .72 ? 1.0 - (depth - .72) / .28 * .55 : 1.0;
+            widthAtY = (.42 + middleBulge * .72) * Math.max(.38, Math.min(1.0, bottomTaper));
+        }
+        else {
+            widthAtY = Math.sin(depth * Math.PI);
+        }
 
-        if (widthAtY <= .08 || radial > widthAtY) {
+        double wallRoughness = (normalize(noise3(canyonWallNoise, x - progress * 17.0, y, z + progress * 17.0, .052)) - .5) * .18;
+        if (widthAtY <= .08 || radial > widthAtY + wallRoughness) {
             return false;
         }
         return !isCanyonLedge(canyon, radial, y, x, z, progress);
     }
 
     private boolean isCanyonLedge(Canyon canyon, double radial, int y, int x, int z, double progress) {
-        if (radial < .46 || radial > .98) {
+        if (radial < .58 || radial > .96) {
             return false;
         }
 
-        int band = positiveMod(y + canyon.ledgeOffset, 11);
-        if (band > 1 && band < 10) {
+        int band = positiveMod(y + canyon.ledgeOffset, 13);
+        if (band > 1) {
             return false;
         }
 
         double ledgeNoise = normalize(noise3(canyonWallNoise, x + progress * 23.0, y, z - progress * 23.0, .075));
-        return ledgeNoise > .38;
+        return ledgeNoise > .58;
     }
 
     private void carveCanyonBlock(ModernCarvingContext context, int x, int y, int z, Canyon canyon,
@@ -240,6 +250,20 @@ class ModernCanyonCarver {
         }
 
         int lavaLevel = canyon.hasLavaLake ? canyon.bottomY + 2 : liquidAltitude;
+        int localX = context.localX(x);
+        int localZ = context.localZ(z);
+        IBlockState currentState = context.primer.getBlockState(localX, y, localZ);
+        IBlockState proposedState = y <= lavaLevel ? canyonLavaBlock : Blocks.AIR.getDefaultState();
+        if (currentState.getMaterial() == Material.WATER || currentState.getMaterial() == Material.LAVA) {
+            if (context.hasApiCallbacks) {
+                BlockPos blockPos = new BlockPos(x, y, z);
+                proposedState = BetterCavesAPI.resolveModernCaveCarvedBlock(world, blockPos, currentState,
+                    proposedState, ModernCaveCarvingType.CANYON);
+            }
+            context.primer.setBlockState(localX, y, localZ, proposedState);
+            return;
+        }
+
         if (!context.hasApiCallbacks) {
             CarverUtils.digBlock(world, context.primer, mutableBlockPos, Blocks.AIR.getDefaultState(), canyonLavaBlock,
                 lavaLevel, replaceFloatingGravel);
@@ -247,8 +271,6 @@ class ModernCanyonCarver {
         }
 
         BlockPos blockPos = new BlockPos(x, y, z);
-        IBlockState currentState = context.primer.getBlockState(context.localX(x), y, context.localZ(z));
-        IBlockState proposedState = y <= lavaLevel ? canyonLavaBlock : Blocks.AIR.getDefaultState();
         IBlockState carveState = BetterCavesAPI.resolveModernCaveCarvedBlock(world, blockPos, currentState,
             proposedState, ModernCaveCarvingType.CANYON);
         CarverUtils.digBlock(world, context.primer, blockPos, carveState, null, -1, replaceFloatingGravel);
