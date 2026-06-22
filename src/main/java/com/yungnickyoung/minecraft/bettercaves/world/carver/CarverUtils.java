@@ -28,7 +28,18 @@ public class CarverUtils {
     private static final IBlockState REDSANDSTONE = Blocks.RED_SANDSTONE.getDefaultState();
     private static final IBlockState GRAVEL = Blocks.GRAVEL.getDefaultState();
     private static final IBlockState ANDESITE = Blocks.STONE.getDefaultState().withProperty(BlockStone.VARIANT, BlockStone.EnumType.ANDESITE);
-    private static final ImmutableSet<IBlockState> DEBUG_BLOCKS = ImmutableSet.of(Blocks.GOLD_BLOCK.getDefaultState(), Blocks.PLANKS.getDefaultState(), Blocks.COBBLESTONE.getDefaultState(), Blocks.REDSTONE_BLOCK.getDefaultState(), Blocks.EMERALD_BLOCK.getDefaultState(), Blocks.BRICK_BLOCK.getDefaultState());
+    private static final ImmutableSet<IBlockState> DEBUG_BLOCKS = ImmutableSet.of(
+        Blocks.GOLD_BLOCK.getDefaultState(),
+        Blocks.PLANKS.getDefaultState(),
+        Blocks.COBBLESTONE.getDefaultState(),
+        Blocks.REDSTONE_BLOCK.getDefaultState(),
+        Blocks.EMERALD_BLOCK.getDefaultState(),
+        Blocks.BRICK_BLOCK.getDefaultState(),
+        Blocks.LAPIS_BLOCK.getDefaultState(),
+        Blocks.QUARTZ_BLOCK.getDefaultState(),
+        Blocks.IRON_BLOCK.getDefaultState(),
+        Blocks.DIAMOND_BLOCK.getDefaultState()
+    );
 
     /**
      * Digs out the current block, default implementation removes stone, filler, and top block.

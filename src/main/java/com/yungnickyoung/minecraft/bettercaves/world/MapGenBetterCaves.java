@@ -5,6 +5,7 @@ import com.yungnickyoung.minecraft.bettercaves.config.io.ConfigLoader;
 import com.yungnickyoung.minecraft.bettercaves.config.util.ConfigHolder;
 import com.yungnickyoung.minecraft.bettercaves.util.BetterCavesUtils;
 import com.yungnickyoung.minecraft.bettercaves.world.bedrock.FlattenBedrock;
+import com.yungnickyoung.minecraft.bettercaves.world.carver.modern.ModernCaveCarverController;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.ChunkPrimer;
@@ -27,6 +28,7 @@ public class MapGenBetterCaves extends MapGenCaves {
     public WaterRegionController waterRegionController;
     private CaveCarverController caveCarverController;
     private CavernCarverController cavernCarverController;
+    private ModernCaveCarverController modernCaveCarverController;
 
     // Config holder for options specific to this carver
     public ConfigHolder config;
@@ -87,6 +89,7 @@ public class MapGenBetterCaves extends MapGenCaves {
         // Carve chunk
         caveCarverController.carveChunk(primer, chunkX, chunkZ, surfaceAltitudes, liquidBlocks);
         cavernCarverController.carveChunk(primer, chunkX, chunkZ, surfaceAltitudes, liquidBlocks);
+        modernCaveCarverController.carveChunk(primer, chunkX, chunkZ, surfaceAltitudes, liquidBlocks);
     }
 
     /**
@@ -104,5 +107,6 @@ public class MapGenBetterCaves extends MapGenCaves {
         this.waterRegionController = new WaterRegionController(world, config);
         this.caveCarverController = new CaveCarverController(world, config);
         this.cavernCarverController = new CavernCarverController(worldIn, config);
+        this.modernCaveCarverController = new ModernCaveCarverController(worldIn, config);
     }
 }

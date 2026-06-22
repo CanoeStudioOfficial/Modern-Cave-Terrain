@@ -148,6 +148,76 @@ public class ConfigHolder {
                 .setCategory("general.underground generation.caverns.floored caverns")
                 .addToMap(properties);
 
+        // Modern cave settings
+        enableModernCaves = new ConfigOption<>("Enable Modern Caves", Configuration.caveSettings.modernCaves.enableModernCaves)
+            .setCategory("general.underground generation.modern caves")
+            .addToMap(properties);
+        modernCaveBottom = new ConfigOption<>("Modern Cave Minimum Altitude", Configuration.caveSettings.modernCaves.caveBottom)
+            .setCategory("general.underground generation.modern caves")
+            .addToMap(properties);
+        modernCaveTop = new ConfigOption<>("Modern Cave Maximum Altitude", Configuration.caveSettings.modernCaves.caveTop)
+            .setCategory("general.underground generation.modern caves")
+            .addToMap(properties);
+
+        enableCheeseCaves = new ConfigOption<>("Enable Cheese Caves", Configuration.caveSettings.modernCaves.cheeseCaves.enableCheeseCaves)
+            .setCategory("general.underground generation.modern caves.cheese caves")
+            .addToMap(properties);
+        cheeseCaveSpawnChance = new ConfigOption<>("Cheese Cave Spawn Chance", Configuration.caveSettings.modernCaves.cheeseCaves.spawnChance)
+            .setCategory("general.underground generation.modern caves.cheese caves")
+            .addToMap(properties);
+        cheeseCaveSize = new ConfigOption<>("Cheese Cave Size", Configuration.caveSettings.modernCaves.cheeseCaves.size)
+            .setCategory("general.underground generation.modern caves.cheese caves")
+            .addToMap(properties);
+
+        enableNoodleCaves = new ConfigOption<>("Enable Noodle Caves", Configuration.caveSettings.modernCaves.noodleCaves.enableNoodleCaves)
+            .setCategory("general.underground generation.modern caves.noodle caves")
+            .addToMap(properties);
+        noodleCaveSpawnChance = new ConfigOption<>("Noodle Cave Spawn Chance", Configuration.caveSettings.modernCaves.noodleCaves.spawnChance)
+            .setCategory("general.underground generation.modern caves.noodle caves")
+            .addToMap(properties);
+        noodleCaveThickness = new ConfigOption<>("Noodle Cave Thickness", Configuration.caveSettings.modernCaves.noodleCaves.thickness)
+            .setCategory("general.underground generation.modern caves.noodle caves")
+            .addToMap(properties);
+
+        enableSpaghettiCaves = new ConfigOption<>("Enable Spaghetti Caves", Configuration.caveSettings.modernCaves.spaghettiCaves.enableSpaghettiCaves)
+            .setCategory("general.underground generation.modern caves.spaghetti caves")
+            .addToMap(properties);
+        spaghettiCaveSpawnChance = new ConfigOption<>("Spaghetti Cave Spawn Chance", Configuration.caveSettings.modernCaves.spaghettiCaves.spawnChance)
+            .setCategory("general.underground generation.modern caves.spaghetti caves")
+            .addToMap(properties);
+        spaghettiCaveThickness = new ConfigOption<>("Spaghetti Cave Thickness", Configuration.caveSettings.modernCaves.spaghettiCaves.thickness)
+            .setCategory("general.underground generation.modern caves.spaghetti caves")
+            .addToMap(properties);
+
+        enableModernCanyons = new ConfigOption<>("Enable Canyons", Configuration.caveSettings.modernCaves.canyons.enableCanyons)
+            .setCategory("general.underground generation.modern caves.canyons")
+            .addToMap(properties);
+        canyonSpawnChance = new ConfigOption<>("Canyon Spawn Chance", Configuration.caveSettings.modernCaves.canyons.spawnChance)
+            .setCategory("general.underground generation.modern caves.canyons")
+            .addToMap(properties);
+        canyonWidth = new ConfigOption<>("Canyon Width", Configuration.caveSettings.modernCaves.canyons.width)
+            .setCategory("general.underground generation.modern caves.canyons")
+            .addToMap(properties);
+
+        enableAquifers = new ConfigOption<>("Enable Aquifers", Configuration.caveSettings.modernCaves.aquifers.enableAquifers)
+            .setCategory("general.underground generation.modern caves.aquifers")
+            .addToMap(properties);
+        aquiferBottom = new ConfigOption<>("Aquifer Minimum Altitude", Configuration.caveSettings.modernCaves.aquifers.aquiferBottom)
+            .setCategory("general.underground generation.modern caves.aquifers")
+            .addToMap(properties);
+        aquiferTop = new ConfigOption<>("Aquifer Maximum Altitude", Configuration.caveSettings.modernCaves.aquifers.aquiferTop)
+            .setCategory("general.underground generation.modern caves.aquifers")
+            .addToMap(properties);
+        aquiferWaterLevelMin = new ConfigOption<>("Aquifer Water Level Min", Configuration.caveSettings.modernCaves.aquifers.waterLevelMin)
+            .setCategory("general.underground generation.modern caves.aquifers")
+            .addToMap(properties);
+        aquiferWaterLevelMax = new ConfigOption<>("Aquifer Water Level Max", Configuration.caveSettings.modernCaves.aquifers.waterLevelMax)
+            .setCategory("general.underground generation.modern caves.aquifers")
+            .addToMap(properties);
+        aquiferWaterChance = new ConfigOption<>("Aquifer Water Chance", Configuration.caveSettings.modernCaves.aquifers.waterChance)
+            .setCategory("general.underground generation.modern caves.aquifers")
+            .addToMap(properties);
+
         // Water region settings
         waterRegionSpawnChance = new ConfigOption<>("Water Region Spawn Chance", Configuration.caveSettings.waterRegions.waterRegionSpawnChance)
             .setCategory("general.underground generation.water regions")
@@ -385,6 +455,34 @@ public class ConfigHolder {
     public ConfigOption<Float>    flooredCavernYCompression;
     public ConfigOption<Float>    flooredCavernXZCompression;
     public ConfigOption<Integer>  flooredCavernPriority;
+
+    // Modern cave settings
+    public ConfigOption<Boolean> enableModernCaves;
+    public ConfigOption<Integer> modernCaveBottom;
+    public ConfigOption<Integer> modernCaveTop;
+
+    public ConfigOption<Boolean> enableCheeseCaves;
+    public ConfigOption<Float>   cheeseCaveSpawnChance;
+    public ConfigOption<Float>   cheeseCaveSize;
+
+    public ConfigOption<Boolean> enableNoodleCaves;
+    public ConfigOption<Float>   noodleCaveSpawnChance;
+    public ConfigOption<Float>   noodleCaveThickness;
+
+    public ConfigOption<Boolean> enableSpaghettiCaves;
+    public ConfigOption<Float>   spaghettiCaveSpawnChance;
+    public ConfigOption<Float>   spaghettiCaveThickness;
+
+    public ConfigOption<Boolean> enableModernCanyons;
+    public ConfigOption<Float>   canyonSpawnChance;
+    public ConfigOption<Float>   canyonWidth;
+
+    public ConfigOption<Boolean> enableAquifers;
+    public ConfigOption<Integer> aquiferBottom;
+    public ConfigOption<Integer> aquiferTop;
+    public ConfigOption<Integer> aquiferWaterLevelMin;
+    public ConfigOption<Integer> aquiferWaterLevelMax;
+    public ConfigOption<Float>   aquiferWaterChance;
 
     // Water region settings
     public ConfigOption<Float>      waterRegionSpawnChance;

@@ -14,6 +14,10 @@ public class ConfigUndergroundGen {
     @Config.Comment("Settings used in the generation of caverns. Caverns are spacious caves at low altitudes.")
     public ConfigCaverns caverns = new ConfigCaverns();
 
+    @Config.Name("Modern Caves")
+    @Config.Comment("Settings used in the generation of 1.18+ style noise caves.")
+    public ConfigModernCaves modernCaves = new ConfigModernCaves();
+
     @Config.Name("Water Regions")
     @Config.Comment("Settings used in the generation of water regions.")
     public ConfigWaterRegions waterRegions = new ConfigWaterRegions();
