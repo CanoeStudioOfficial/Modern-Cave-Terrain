@@ -1,8 +1,11 @@
 package com.yungnickyoung.minecraft.bettercaves.world.carver.modern;
 
 import com.yungnickyoung.minecraft.bettercaves.BetterCaves;
+import com.yungnickyoung.minecraft.bettercaves.api.BetterCavesAPI;
+import com.yungnickyoung.minecraft.bettercaves.api.ModernCaveCarvingType;
 import com.yungnickyoung.minecraft.bettercaves.config.util.ConfigHolder;
 import com.yungnickyoung.minecraft.bettercaves.noise.OpenSimplex2S;
+import com.yungnickyoung.minecraft.bettercaves.util.BetterCavesUtils;
 import com.yungnickyoung.minecraft.bettercaves.world.carver.CarverUtils;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
@@ -17,6 +20,9 @@ import java.util.Random;
 public class ModernCaveCarverController {
     private static final int CANYON_CELL_CHUNKS = 8;
     private static final int CANYON_SEARCH_RADIUS = 2;
+    private static final int CHEESE_COLUMN_MASK = 1;
+    private static final int SPAGHETTI_COLUMN_MASK = 1 << 1;
+    private static final int NOODLE_COLUMN_MASK = 1 << 2;
     private static final IBlockState CHEESE_DEBUG_BLOCK = Blocks.LAPIS_BLOCK.getDefaultState();
     private static final IBlockState SPAGHETTI_DEBUG_BLOCK = Blocks.QUARTZ_BLOCK.getDefaultState();
     private static final IBlockState NOODLE_DEBUG_BLOCK = Blocks.IRON_BLOCK.getDefaultState();
@@ -124,8 +130,9 @@ public class ModernCaveCarverController {
             return;
         }
 
+        boolean hasApiCallbacks = BetterCavesAPI.hasModernCaveCarvingCallbacks();
         if (canyonsEnabled) {
-            carveCanyons(primer, chunkX, chunkZ, surfaceAltitudes);
+            carveCanyons(primer, chunkX, chunkZ, surfaceAltitudes, hasApiCallbacks);
         }
 
         for (int localX = 0; localX < 16; localX++) {
@@ -142,19 +149,27 @@ public class ModernCaveCarverController {
                 }
 
                 IBlockState fallbackLiquidBlock = liquidBlocks[localX][localZ];
+                int columnCarveMask = createColumnCarveMask(blockX, blockZ);
+                if (columnCarveMask == 0) {
+                    continue;
+                }
+                AquiferSampler.ColumnSample aquiferColumnSample = aquiferSampler.sampleColumn(blockX, blockZ, surfaceAltitude);
+                BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 
                 for (int y = columnTopY; y >= bottomY; y--) {
-                    IBlockState debugBlock = getDebugBlockForCarve(blockX, y, blockZ, surfaceAltitude);
-                    if (debugBlock == null) {
+                    ModernCaveCarvingType carvingType = getCarvingType(columnCarveMask, blockX, y, blockZ, surfaceAltitude);
+                    if (carvingType == null) {
                         continue;
                     }
 
-                    Material currentMaterial = primer.getBlockState(localX, y, localZ).getMaterial();
+                    IBlockState currentState = primer.getBlockState(localX, y, localZ);
+                    Material currentMaterial = currentState.getMaterial();
                     if (currentMaterial == Material.AIR || currentMaterial == Material.WATER || currentMaterial == Material.LAVA) {
                         continue;
                     }
 
-                    AquiferSampler.Sample aquiferSample = aquiferSampler.sample(blockX, y, blockZ, surfaceAltitude, fallbackLiquidBlock);
+                    AquiferSampler.Sample aquiferSample = aquiferSampler.sample(blockX, y, blockZ, surfaceAltitude,
+                        fallbackLiquidBlock, aquiferColumnSample);
                     if (aquiferSample.isBlocked()) {
                         continue;
                     }
@@ -163,36 +178,71 @@ public class ModernCaveCarverController {
                         continue;
                     }
 
-                    BlockPos blockPos = new BlockPos(blockX, y, blockZ);
                     if (debugVisualizerEnabled) {
-                        CarverUtils.debugDigBlock(primer, blockPos, debugBlock, true);
+                        mutableBlockPos.setPos(blockX, y, blockZ);
+                        CarverUtils.debugDigBlock(primer, mutableBlockPos, getDebugBlockForCarve(carvingType), true);
                     }
                     else {
-                        CarverUtils.digBlock(world, primer, blockPos, aquiferSample.getBlockState(), null, -1, replaceFloatingGravel);
+                        IBlockState carveState = aquiferSample.getBlockState();
+                        if (hasApiCallbacks) {
+                            BlockPos blockPos = new BlockPos(blockX, y, blockZ);
+                            carveState = BetterCavesAPI.resolveModernCaveCarvedBlock(world, blockPos,
+                                currentState, carveState, carvingType);
+                            CarverUtils.digBlock(world, primer, blockPos, carveState, null, -1, replaceFloatingGravel);
+                        }
+                        else {
+                            mutableBlockPos.setPos(blockX, y, blockZ);
+                            CarverUtils.digBlock(world, primer, mutableBlockPos, carveState, null, -1, replaceFloatingGravel);
+                        }
                     }
                 }
             }
         }
     }
 
-    private IBlockState getDebugBlockForCarve(int x, int y, int z, int surfaceAltitude) {
-        if (cheeseCavesEnabled && shouldCarveCheese(x, y, z, surfaceAltitude)) {
-            return CHEESE_DEBUG_BLOCK;
+    private int createColumnCarveMask(int x, int z) {
+        int mask = 0;
+        if (cheeseCavesEnabled && passesRegionChance(cheeseRegionNoise, x, z, cheeseSpawnChance, .0035)) {
+            mask |= CHEESE_COLUMN_MASK;
         }
-        if (spaghettiCavesEnabled && shouldCarveSpaghetti(x, y, z, surfaceAltitude)) {
-            return SPAGHETTI_DEBUG_BLOCK;
+        if (spaghettiCavesEnabled && passesRegionChance(spaghettiRegionNoise, x, z, spaghettiSpawnChance, .006)) {
+            mask |= SPAGHETTI_COLUMN_MASK;
         }
-        if (noodleCavesEnabled && shouldCarveNoodle(x, y, z, surfaceAltitude)) {
-            return NOODLE_DEBUG_BLOCK;
+        if (noodleCavesEnabled && passesRegionChance(noodleRegionNoise, x, z, noodleSpawnChance, .009)) {
+            mask |= NOODLE_COLUMN_MASK;
+        }
+        return mask;
+    }
+
+    private ModernCaveCarvingType getCarvingType(int columnCarveMask, int x, int y, int z, int surfaceAltitude) {
+        if ((columnCarveMask & CHEESE_COLUMN_MASK) != 0 && shouldCarveCheese(x, y, z, surfaceAltitude)) {
+            return ModernCaveCarvingType.CHEESE;
+        }
+        if ((columnCarveMask & SPAGHETTI_COLUMN_MASK) != 0 && shouldCarveSpaghetti(x, y, z, surfaceAltitude)) {
+            return ModernCaveCarvingType.SPAGHETTI;
+        }
+        if ((columnCarveMask & NOODLE_COLUMN_MASK) != 0 && shouldCarveNoodle(x, y, z, surfaceAltitude)) {
+            return ModernCaveCarvingType.NOODLE;
         }
         return null;
     }
 
-    private boolean shouldCarveCheese(int x, int y, int z, int surfaceAltitude) {
-        if (!passesRegionChance(cheeseRegionNoise, x, z, cheeseSpawnChance, .0035)) {
-            return false;
+    private IBlockState getDebugBlockForCarve(ModernCaveCarvingType carvingType) {
+        switch (carvingType) {
+            case CHEESE:
+                return CHEESE_DEBUG_BLOCK;
+            case SPAGHETTI:
+                return SPAGHETTI_DEBUG_BLOCK;
+            case NOODLE:
+                return NOODLE_DEBUG_BLOCK;
+            case CANYON:
+                return CANYON_DEBUG_BLOCK;
+            default:
+                return Blocks.AIR.getDefaultState();
         }
+    }
 
+    private boolean shouldCarveCheese(int x, int y, int z, int surfaceAltitude) {
         float fade = caveFade(y, surfaceAltitude, false);
         if (fade <= 0f) {
             return false;
@@ -205,10 +255,6 @@ public class ModernCaveCarverController {
     }
 
     private boolean shouldCarveSpaghetti(int x, int y, int z, int surfaceAltitude) {
-        if (!passesRegionChance(spaghettiRegionNoise, x, z, spaghettiSpawnChance, .006)) {
-            return false;
-        }
-
         float fade = caveFade(y, surfaceAltitude, false);
         if (fade <= 0f) {
             return false;
@@ -221,10 +267,6 @@ public class ModernCaveCarverController {
     }
 
     private boolean shouldCarveNoodle(int x, int y, int z, int surfaceAltitude) {
-        if (!passesRegionChance(noodleRegionNoise, x, z, noodleSpawnChance, .009)) {
-            return false;
-        }
-
         float fade = caveFade(y, surfaceAltitude, false);
         if (fade <= 0f) {
             return false;
@@ -240,7 +282,7 @@ public class ModernCaveCarverController {
             noodleBSampler.carveBand(x - 47, y + 23, z + 61, thickness);
     }
 
-    private void carveCanyons(ChunkPrimer primer, int chunkX, int chunkZ, int[][] surfaceAltitudes) {
+    private void carveCanyons(ChunkPrimer primer, int chunkX, int chunkZ, int[][] surfaceAltitudes, boolean hasApiCallbacks) {
         int cellX = Math.floorDiv(chunkX, CANYON_CELL_CHUNKS);
         int cellZ = Math.floorDiv(chunkZ, CANYON_CELL_CHUNKS);
 
@@ -248,7 +290,7 @@ public class ModernCaveCarverController {
             for (int searchZ = cellZ - CANYON_SEARCH_RADIUS; searchZ <= cellZ + CANYON_SEARCH_RADIUS; searchZ++) {
                 Canyon canyon = createCanyon(searchX, searchZ);
                 if (canyon != null) {
-                    carveCanyon(primer, chunkX, chunkZ, surfaceAltitudes, canyon);
+                    carveCanyon(primer, chunkX, chunkZ, surfaceAltitudes, canyon, hasApiCallbacks);
                 }
             }
         }
@@ -284,13 +326,15 @@ public class ModernCaveCarverController {
             height, canyonBottom, canyonBottom <= liquidAltitude + 8, ledgeOffset, random.nextDouble() * Math.PI * 2.0);
     }
 
-    private void carveCanyon(ChunkPrimer primer, int chunkX, int chunkZ, int[][] surfaceAltitudes, Canyon canyon) {
+    private void carveCanyon(ChunkPrimer primer, int chunkX, int chunkZ, int[][] surfaceAltitudes, Canyon canyon,
+                             boolean hasApiCallbacks) {
         double yawX = Math.cos(canyon.yaw);
         double yawZ = Math.sin(canyon.yaw);
         double normalX = -yawZ;
         double normalZ = yawX;
         int chunkBlockX = chunkX * 16;
         int chunkBlockZ = chunkZ * 16;
+        BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 
         for (int step = 0; step < canyon.length; step += 2) {
             double progress = canyon.length <= 1 ? 0.0 : (double)step / (double)(canyon.length - 1);
@@ -331,7 +375,7 @@ public class ModernCaveCarverController {
                         if (!shouldCarveCanyonBlock(canyon, radial, y, yTop, yBottom, blockX, blockZ, progress)) {
                             continue;
                         }
-                        carveCanyonBlock(primer, blockX, y, blockZ, canyon);
+                        carveCanyonBlock(primer, blockX, y, blockZ, canyon, mutableBlockPos, hasApiCallbacks);
                     }
                 }
             }
@@ -386,15 +430,26 @@ public class ModernCaveCarverController {
         return ledgeNoise > .38;
     }
 
-    private void carveCanyonBlock(ChunkPrimer primer, int x, int y, int z, Canyon canyon) {
-        BlockPos blockPos = new BlockPos(x, y, z);
+    private void carveCanyonBlock(ChunkPrimer primer, int x, int y, int z, Canyon canyon,
+                                  BlockPos.MutableBlockPos mutableBlockPos, boolean hasApiCallbacks) {
+        mutableBlockPos.setPos(x, y, z);
         if (debugVisualizerEnabled) {
-            CarverUtils.debugDigBlock(primer, blockPos, CANYON_DEBUG_BLOCK, true);
+            CarverUtils.debugDigBlock(primer, mutableBlockPos, getDebugBlockForCarve(ModernCaveCarvingType.CANYON), true);
             return;
         }
 
         int lavaLevel = canyon.hasLavaLake ? canyon.bottomY + 2 : liquidAltitude;
-        CarverUtils.digBlock(world, primer, blockPos, Blocks.AIR.getDefaultState(), canyonLavaBlock, lavaLevel, replaceFloatingGravel);
+        if (!hasApiCallbacks) {
+            CarverUtils.digBlock(world, primer, mutableBlockPos, Blocks.AIR.getDefaultState(), canyonLavaBlock, lavaLevel, replaceFloatingGravel);
+            return;
+        }
+
+        BlockPos blockPos = new BlockPos(x, y, z);
+        IBlockState currentState = primer.getBlockState(BetterCavesUtils.getLocal(x), y, BetterCavesUtils.getLocal(z));
+        IBlockState proposedState = y <= lavaLevel ? canyonLavaBlock : Blocks.AIR.getDefaultState();
+        IBlockState carveState = BetterCavesAPI.resolveModernCaveCarvedBlock(world, blockPos, currentState,
+            proposedState, ModernCaveCarvingType.CANYON);
+        CarverUtils.digBlock(world, primer, blockPos, carveState, null, -1, replaceFloatingGravel);
     }
 
     private boolean isUnsafeAquiferWaterPlacement(ChunkPrimer primer, int localX, int y, int localZ) {

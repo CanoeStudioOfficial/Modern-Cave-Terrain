@@ -55,7 +55,25 @@ public class AquiferSampler {
         this.barrierNoise.SetFrequency(.055f);
     }
 
+    public ColumnSample sampleColumn(int x, int z, int surfaceAltitude) {
+        if (!enabled || waterChance <= 0 || !isWaterRegion(x, z)) {
+            return ColumnSample.dry();
+        }
+
+        int waterLevel = getWaterLevel(x, z, surfaceAltitude);
+        boolean nearbyLevelShift =
+            Math.abs(waterLevel - getWaterLevel(x + 16, z, surfaceAltitude)) > 10 ||
+            Math.abs(waterLevel - getWaterLevel(x - 16, z, surfaceAltitude)) > 10 ||
+            Math.abs(waterLevel - getWaterLevel(x, z + 16, surfaceAltitude)) > 10 ||
+            Math.abs(waterLevel - getWaterLevel(x, z - 16, surfaceAltitude)) > 10;
+        return new ColumnSample(true, waterLevel, nearbyLevelShift);
+    }
+
     public Sample sample(int x, int y, int z, int surfaceAltitude, IBlockState fallbackLiquidBlock) {
+        return sample(x, y, z, surfaceAltitude, fallbackLiquidBlock, sampleColumn(x, z, surfaceAltitude));
+    }
+
+    public Sample sample(int x, int y, int z, int surfaceAltitude, IBlockState fallbackLiquidBlock, ColumnSample columnSample) {
         if (y <= liquidAltitude) {
             if (fallbackLiquidBlock == null) {
                 return Sample.blocked();
@@ -71,16 +89,16 @@ public class AquiferSampler {
             return Sample.air();
         }
 
-        if (!isWaterRegion(x, z)) {
+        if (columnSample == null || !columnSample.hasWater()) {
             return Sample.air();
         }
 
-        int waterLevel = getWaterLevel(x, z, surfaceAltitude);
+        int waterLevel = columnSample.getWaterLevel();
         if (y > waterLevel) {
             return Sample.air();
         }
 
-        if (shouldPreserveBarrier(x, y, z, surfaceAltitude, waterLevel)) {
+        if (shouldPreserveBarrier(x, y, z, columnSample)) {
             return Sample.blocked();
         }
 
@@ -101,19 +119,14 @@ public class AquiferSampler {
         return clamp(level, aquiferBottom, ceiling);
     }
 
-    private boolean shouldPreserveBarrier(int x, int y, int z, int surfaceAltitude, int waterLevel) {
+    private boolean shouldPreserveBarrier(int x, int y, int z, ColumnSample columnSample) {
+        int waterLevel = columnSample.getWaterLevel();
         float barrier = barrierNoise.GetNoise(x, y, z);
         if (Math.abs(y - waterLevel) <= 1 && barrier > .45f) {
             return true;
         }
 
-        boolean nearbyLevelShift =
-            Math.abs(waterLevel - getWaterLevel(x + 16, z, surfaceAltitude)) > 10 ||
-            Math.abs(waterLevel - getWaterLevel(x - 16, z, surfaceAltitude)) > 10 ||
-            Math.abs(waterLevel - getWaterLevel(x, z + 16, surfaceAltitude)) > 10 ||
-            Math.abs(waterLevel - getWaterLevel(x, z - 16, surfaceAltitude)) > 10;
-
-        return nearbyLevelShift && Math.abs(y - waterLevel) <= 6 && barrier > .25f;
+        return columnSample.hasNearbyLevelShift() && Math.abs(y - waterLevel) <= 6 && barrier > .25f;
     }
 
     private IBlockState getBlockFromString(World world, String blockName, IBlockState fallback, String role) {
@@ -159,6 +172,36 @@ public class AquiferSampler {
             return max;
         }
         return value;
+    }
+
+    public static class ColumnSample {
+        private static final ColumnSample DRY = new ColumnSample(false, 0, false);
+
+        private final boolean water;
+        private final int waterLevel;
+        private final boolean nearbyLevelShift;
+
+        private ColumnSample(boolean water, int waterLevel, boolean nearbyLevelShift) {
+            this.water = water;
+            this.waterLevel = waterLevel;
+            this.nearbyLevelShift = nearbyLevelShift;
+        }
+
+        public static ColumnSample dry() {
+            return DRY;
+        }
+
+        public boolean hasWater() {
+            return water;
+        }
+
+        public int getWaterLevel() {
+            return waterLevel;
+        }
+
+        public boolean hasNearbyLevelShift() {
+            return nearbyLevelShift;
+        }
     }
 
     public static class Sample {
