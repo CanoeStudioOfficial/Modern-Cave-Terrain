@@ -4,6 +4,7 @@ import com.yungnickyoung.minecraft.bettercaves.BetterCaves;
 import com.yungnickyoung.minecraft.bettercaves.config.util.ConfigHolder;
 import com.yungnickyoung.minecraft.bettercaves.noise.OpenSimplex2S;
 import com.yungnickyoung.minecraft.bettercaves.world.carver.CarverUtils;
+import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.init.Blocks;
@@ -11,7 +12,11 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.ChunkPrimer;
 
+import java.util.Random;
+
 public class ModernCaveCarverController {
+    private static final int CANYON_CELL_CHUNKS = 8;
+    private static final int CANYON_SEARCH_RADIUS = 2;
     private static final IBlockState CHEESE_DEBUG_BLOCK = Blocks.LAPIS_BLOCK.getDefaultState();
     private static final IBlockState SPAGHETTI_DEBUG_BLOCK = Blocks.QUARTZ_BLOCK.getDefaultState();
     private static final IBlockState NOODLE_DEBUG_BLOCK = Blocks.IRON_BLOCK.getDefaultState();
@@ -40,6 +45,7 @@ public class ModernCaveCarverController {
     private final float spaghettiThickness;
     private final float canyonSpawnChance;
     private final float canyonWidth;
+    private final IBlockState canyonLavaBlock;
 
     private final OpenSimplex2S cheeseRegionNoise;
     private final OpenSimplex2S cheeseShapeNoise;
@@ -53,9 +59,6 @@ public class ModernCaveCarverController {
     private final OpenSimplex2S noodleANoise;
     private final OpenSimplex2S noodleBNoise;
     private final OpenSimplex2S noodleToggleNoise;
-    private final OpenSimplex2S canyonRegionNoise;
-    private final OpenSimplex2S canyonAxisNoise;
-    private final OpenSimplex2S canyonWarpNoise;
     private final OpenSimplex2S canyonWallNoise;
 
     public ModernCaveCarverController(World worldIn, ConfigHolder config) {
@@ -79,6 +82,7 @@ public class ModernCaveCarverController {
         this.spaghettiThickness = config.spaghettiCaveThickness.get();
         this.canyonSpawnChance = clamp01(config.canyonSpawnChance.get() / 100f);
         this.canyonWidth = config.canyonWidth.get();
+        this.canyonLavaBlock = getBlockFromString(config.lavaBlock.get(), Blocks.LAVA.getDefaultState());
         this.aquiferSampler = new AquiferSampler(worldIn, config);
 
         long seed = worldIn.getSeed();
@@ -94,9 +98,6 @@ public class ModernCaveCarverController {
         this.noodleANoise = new OpenSimplex2S(seed + 922);
         this.noodleBNoise = new OpenSimplex2S(seed + 923);
         this.noodleToggleNoise = new OpenSimplex2S(seed + 924);
-        this.canyonRegionNoise = new OpenSimplex2S(seed + 931);
-        this.canyonAxisNoise = new OpenSimplex2S(seed + 932);
-        this.canyonWarpNoise = new OpenSimplex2S(seed + 933);
         this.canyonWallNoise = new OpenSimplex2S(seed + 934);
 
         if (config.modernCaveBottom.get() > config.modernCaveTop.get()) {
@@ -107,6 +108,10 @@ public class ModernCaveCarverController {
     public void carveChunk(ChunkPrimer primer, int chunkX, int chunkZ, int[][] surfaceAltitudes, IBlockState[][] liquidBlocks) {
         if (!enabled || (!cheeseCavesEnabled && !noodleCavesEnabled && !spaghettiCavesEnabled && !canyonsEnabled)) {
             return;
+        }
+
+        if (canyonsEnabled) {
+            carveCanyons(primer, chunkX, chunkZ, surfaceAltitudes);
         }
 
         for (int localX = 0; localX < 16; localX++) {
@@ -122,12 +127,16 @@ public class ModernCaveCarverController {
                     continue;
                 }
 
-                boolean canyonColumn = canyonsEnabled && isCanyonColumn(blockX, blockZ);
                 IBlockState fallbackLiquidBlock = liquidBlocks[localX][localZ];
 
                 for (int y = columnTopY; y >= bottomY; y--) {
-                    IBlockState debugBlock = getDebugBlockForCarve(blockX, y, blockZ, surfaceAltitude, canyonColumn);
+                    IBlockState debugBlock = getDebugBlockForCarve(blockX, y, blockZ, surfaceAltitude);
                     if (debugBlock == null) {
+                        continue;
+                    }
+
+                    Material currentMaterial = primer.getBlockState(localX, y, localZ).getMaterial();
+                    if (currentMaterial == Material.AIR || currentMaterial == Material.WATER || currentMaterial == Material.LAVA) {
                         continue;
                     }
 
@@ -152,10 +161,7 @@ public class ModernCaveCarverController {
         }
     }
 
-    private IBlockState getDebugBlockForCarve(int x, int y, int z, int surfaceAltitude, boolean canyonColumn) {
-        if (canyonColumn && shouldCarveCanyonAtY(x, y, z)) {
-            return CANYON_DEBUG_BLOCK;
-        }
+    private IBlockState getDebugBlockForCarve(int x, int y, int z, int surfaceAltitude) {
         if (cheeseCavesEnabled && shouldCarveCheese(x, y, z, surfaceAltitude)) {
             return CHEESE_DEBUG_BLOCK;
         }
@@ -229,29 +235,161 @@ public class ModernCaveCarverController {
         return Math.max(a, b) < thickness;
     }
 
-    private boolean isCanyonColumn(int x, int z) {
-        if (!passesRegionChance(canyonRegionNoise, x, z, canyonSpawnChance, .0018)) {
-            return false;
+    private void carveCanyons(ChunkPrimer primer, int chunkX, int chunkZ, int[][] surfaceAltitudes) {
+        int cellX = Math.floorDiv(chunkX, CANYON_CELL_CHUNKS);
+        int cellZ = Math.floorDiv(chunkZ, CANYON_CELL_CHUNKS);
+
+        for (int searchX = cellX - CANYON_SEARCH_RADIUS; searchX <= cellX + CANYON_SEARCH_RADIUS; searchX++) {
+            for (int searchZ = cellZ - CANYON_SEARCH_RADIUS; searchZ <= cellZ + CANYON_SEARCH_RADIUS; searchZ++) {
+                Canyon canyon = createCanyon(searchX, searchZ);
+                if (canyon != null) {
+                    carveCanyon(primer, chunkX, chunkZ, surfaceAltitudes, canyon);
+                }
+            }
         }
-
-        double warpX = canyonWarpNoise.noise2(x * .01, z * .01) * 22.0;
-        double warpZ = canyonWarpNoise.noise2((x + 211) * .01, (z - 157) * .01) * 22.0;
-        double axis = Math.abs(canyonAxisNoise.noise2((x + warpX) * .0065, (z + warpZ) * .0065));
-        double roughness = normalize(canyonWallNoise.noise2(x * .035, z * .035));
-        double width = canyonWidth * (.65 + roughness * .8);
-
-        return axis < width;
     }
 
-    private boolean shouldCarveCanyonAtY(int x, int y, int z) {
-        if (y <= bottomY + 2) {
+    private Canyon createCanyon(int cellX, int cellZ) {
+        Random random = new Random(mixSeed(cellX, cellZ));
+        if (random.nextFloat() > canyonSpawnChance) {
+            return null;
+        }
+
+        int cellSizeBlocks = CANYON_CELL_CHUNKS * 16;
+        float widthScale = clamp(canyonWidth / .052f, .35f, 2.5f);
+        boolean surface = random.nextFloat() < .45f;
+        double originX = cellX * cellSizeBlocks + random.nextInt(cellSizeBlocks);
+        double originZ = cellZ * cellSizeBlocks + random.nextInt(cellSizeBlocks);
+        double yaw = random.nextDouble() * Math.PI * 2.0;
+        int length = surface ? 96 + random.nextInt(96) : 80 + random.nextInt(112);
+        double width = (surface ? 4.5 + random.nextDouble() * 4.5 : 3.5 + random.nextDouble() * 3.5) * widthScale;
+        double curveAmplitude = (10.0 + random.nextDouble() * 22.0) * widthScale;
+        int ledgeOffset = random.nextInt(11);
+
+        if (surface) {
+            int canyonBottom = 4 + random.nextInt(18);
+            return new Canyon(surface, originX, originZ, yaw, length, width, curveAmplitude, 0,
+                0, canyonBottom, canyonBottom <= liquidAltitude + 8, ledgeOffset, random.nextDouble() * Math.PI * 2.0);
+        }
+
+        int centerY = 28 + random.nextInt(42);
+        int height = 34 + random.nextInt(46);
+        int canyonBottom = Math.max(3, centerY - height / 2);
+        return new Canyon(surface, originX, originZ, yaw, length, width, curveAmplitude, centerY,
+            height, canyonBottom, canyonBottom <= liquidAltitude + 8, ledgeOffset, random.nextDouble() * Math.PI * 2.0);
+    }
+
+    private void carveCanyon(ChunkPrimer primer, int chunkX, int chunkZ, int[][] surfaceAltitudes, Canyon canyon) {
+        double yawX = Math.cos(canyon.yaw);
+        double yawZ = Math.sin(canyon.yaw);
+        double normalX = -yawZ;
+        double normalZ = yawX;
+        int chunkBlockX = chunkX * 16;
+        int chunkBlockZ = chunkZ * 16;
+
+        for (int step = 0; step < canyon.length; step += 2) {
+            double progress = canyon.length <= 1 ? 0.0 : (double)step / (double)(canyon.length - 1);
+            double centeredStep = step - canyon.length * .5;
+            double curve = Math.sin(progress * Math.PI * 2.0 + canyon.phase) * canyon.curveAmplitude;
+            double centerX = canyon.originX + yawX * centeredStep + normalX * curve;
+            double centerZ = canyon.originZ + yawZ * centeredStep + normalZ * curve;
+            double stepWidth = canyon.width * (.78 + Math.sin(progress * Math.PI) * .35);
+            if (centerX + stepWidth + 2.0 < chunkBlockX || centerX - stepWidth - 2.0 > chunkBlockX + 15 ||
+                centerZ + stepWidth + 2.0 < chunkBlockZ || centerZ - stepWidth - 2.0 > chunkBlockZ + 15) {
+                continue;
+            }
+
+            int minLocalX = clamp((int)Math.floor(centerX - stepWidth - 2.0) - chunkBlockX, 0, 15);
+            int maxLocalX = clamp((int)Math.floor(centerX + stepWidth + 2.0) - chunkBlockX, 0, 15);
+            int minLocalZ = clamp((int)Math.floor(centerZ - stepWidth - 2.0) - chunkBlockZ, 0, 15);
+            int maxLocalZ = clamp((int)Math.floor(centerZ + stepWidth + 2.0) - chunkBlockZ, 0, 15);
+
+            for (int localX = minLocalX; localX <= maxLocalX; localX++) {
+                int blockX = chunkBlockX + localX;
+                for (int localZ = minLocalZ; localZ <= maxLocalZ; localZ++) {
+                    int blockZ = chunkBlockZ + localZ;
+                    double dx = blockX + .5 - centerX;
+                    double dz = blockZ + .5 - centerZ;
+                    double radial = Math.sqrt(dx * dx + dz * dz) / stepWidth;
+                    if (radial > 1.15) {
+                        continue;
+                    }
+
+                    int surfaceAltitude = surfaceAltitudes[localX][localZ];
+                    int yTop = getCanyonTopY(canyon, surfaceAltitude);
+                    int yBottom = getCanyonBottomY(canyon);
+                    if (yTop <= yBottom) {
+                        continue;
+                    }
+
+                    for (int y = yTop; y >= yBottom; y--) {
+                        if (!shouldCarveCanyonBlock(canyon, radial, y, yTop, yBottom, blockX, blockZ, progress)) {
+                            continue;
+                        }
+                        carveCanyonBlock(primer, blockX, y, blockZ, canyon);
+                    }
+                }
+            }
+        }
+    }
+
+    private int getCanyonTopY(Canyon canyon, int surfaceAltitude) {
+        if (canyon.surface) {
+            return overrideSurfaceDetection || debugVisualizerEnabled
+                ? topY
+                : clamp(surfaceAltitude + 2, 1, 254);
+        }
+
+        int top = clamp(canyon.centerY + canyon.height / 2, bottomY, topY);
+        if (!overrideSurfaceDetection && !debugVisualizerEnabled) {
+            top = Math.min(top, surfaceAltitude - 8);
+        }
+        return clamp(top, 1, 254);
+    }
+
+    private int getCanyonBottomY(Canyon canyon) {
+        if (canyon.surface) {
+            return clamp(canyon.bottomY, bottomY, topY);
+        }
+        return clamp(canyon.centerY - canyon.height / 2, bottomY, topY);
+    }
+
+    private boolean shouldCarveCanyonBlock(Canyon canyon, double radial, int y, int top, int bottom, int x, int z, double progress) {
+        int span = Math.max(1, top - bottom);
+        double depth = (double)(top - y) / (double)span;
+        double widthAtY = canyon.surface
+            ? .72 + Math.sin(depth * Math.PI) * .43
+            : Math.sin(depth * Math.PI);
+
+        if (widthAtY <= .08 || radial > widthAtY) {
+            return false;
+        }
+        return !isCanyonLedge(canyon, radial, y, x, z, progress);
+    }
+
+    private boolean isCanyonLedge(Canyon canyon, double radial, int y, int x, int z, double progress) {
+        if (radial < .46 || radial > .98) {
             return false;
         }
 
-        float bottomFade = smoothStep((float)(y - bottomY - 2) / 10f);
-        double ledgeNoise = normalize(noise3(canyonWallNoise, x, y, z, .07));
+        int band = positiveMod(y + canyon.ledgeOffset, 11);
+        if (band > 1 && band < 10) {
+            return false;
+        }
 
-        return bottomFade > .35f || ledgeNoise > .52;
+        double ledgeNoise = normalize(noise3(canyonWallNoise, x + progress * 23.0, y, z - progress * 23.0, .075));
+        return ledgeNoise > .38;
+    }
+
+    private void carveCanyonBlock(ChunkPrimer primer, int x, int y, int z, Canyon canyon) {
+        BlockPos blockPos = new BlockPos(x, y, z);
+        if (debugVisualizerEnabled) {
+            CarverUtils.debugDigBlock(primer, blockPos, CANYON_DEBUG_BLOCK, true);
+            return;
+        }
+
+        int lavaLevel = canyon.hasLavaLake ? canyon.bottomY + 2 : liquidAltitude;
+        CarverUtils.digBlock(world, primer, blockPos, Blocks.AIR.getDefaultState(), canyonLavaBlock, lavaLevel, replaceFloatingGravel);
     }
 
     private boolean isUnsafeAquiferWaterPlacement(ChunkPrimer primer, int localX, int y, int localZ) {
@@ -312,6 +450,32 @@ public class ModernCaveCarverController {
         return noise.noise3_XZBeforeY(x * frequency, y * frequency, z * frequency);
     }
 
+    private IBlockState getBlockFromString(String blockName, IBlockState fallback) {
+        try {
+            Block block = Block.getBlockFromName(blockName);
+            if (block != null) {
+                return block.getDefaultState();
+            }
+        }
+        catch (Exception ignored) {
+        }
+        return fallback;
+    }
+
+    private long mixSeed(int cellX, int cellZ) {
+        long mixed = world.getSeed();
+        mixed ^= (long)cellX * 341873128712L;
+        mixed ^= (long)cellZ * 132897987541L;
+        mixed = mixed * 6364136223846793005L + 1442695040888963407L;
+        mixed ^= mixed >>> 33;
+        return mixed;
+    }
+
+    private static int positiveMod(int value, int divisor) {
+        int result = value % divisor;
+        return result < 0 ? result + divisor : result;
+    }
+
     private static double normalize(double value) {
         return clamp01((float)((value + 1.0) * .5));
     }
@@ -339,5 +503,49 @@ public class ModernCaveCarverController {
             return max;
         }
         return value;
+    }
+
+    private static float clamp(float value, float min, float max) {
+        if (value < min) {
+            return min;
+        }
+        if (value > max) {
+            return max;
+        }
+        return value;
+    }
+
+    private static class Canyon {
+        private final boolean surface;
+        private final double originX;
+        private final double originZ;
+        private final double yaw;
+        private final int length;
+        private final double width;
+        private final double curveAmplitude;
+        private final int centerY;
+        private final int height;
+        private final int bottomY;
+        private final boolean hasLavaLake;
+        private final int ledgeOffset;
+        private final double phase;
+
+        private Canyon(boolean surface, double originX, double originZ, double yaw, int length, double width,
+                       double curveAmplitude, int centerY, int height, int bottomY, boolean hasLavaLake,
+                       int ledgeOffset, double phase) {
+            this.surface = surface;
+            this.originX = originX;
+            this.originZ = originZ;
+            this.yaw = yaw;
+            this.length = length;
+            this.width = width;
+            this.curveAmplitude = curveAmplitude;
+            this.centerY = centerY;
+            this.height = height;
+            this.bottomY = bottomY;
+            this.hasLavaLake = hasLavaLake;
+            this.ledgeOffset = ledgeOffset;
+            this.phase = phase;
+        }
     }
 }

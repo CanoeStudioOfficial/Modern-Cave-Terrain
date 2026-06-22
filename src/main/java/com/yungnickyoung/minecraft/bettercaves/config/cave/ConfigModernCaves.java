@@ -150,10 +150,10 @@ public class ConfigModernCaves {
         @Config.Name("Aquifer Minimum Altitude")
         @Config.Comment(
             "The minimum y-coordinate at which aquifers can place water.\n" +
-                "Default: 8")
+                "Default: 18")
         @Config.RangeInt(min = 0, max = 255)
         @Config.RequiresWorldRestart
-        public int aquiferBottom = 8;
+        public int aquiferBottom = 18;
 
         @Config.Name("Aquifer Maximum Altitude")
         @Config.Comment(
@@ -182,9 +182,9 @@ public class ConfigModernCaves {
         @Config.Name("Aquifer Water Chance")
         @Config.Comment(
             "Percent chance for local aquifer cells to contain water.\n" +
-                "Default: 55")
+                "Default: 35")
         @Config.RangeDouble(min = 0, max = 100)
         @Config.RequiresWorldRestart
-        public float waterChance = 55;
+        public float waterChance = 35;
     }
 }
