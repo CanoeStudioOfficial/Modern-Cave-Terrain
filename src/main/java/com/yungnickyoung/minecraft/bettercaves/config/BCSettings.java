@@ -1,5 +1,6 @@
 package com.yungnickyoung.minecraft.bettercaves.config;
 
+
 import com.yungnickyoung.minecraft.bettercaves.Tags;
 
 /**
