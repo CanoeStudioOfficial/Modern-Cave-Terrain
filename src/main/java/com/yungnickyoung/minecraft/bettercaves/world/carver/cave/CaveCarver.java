@@ -1,30 +1,29 @@
 package com.yungnickyoung.minecraft.bettercaves.world.carver.cave;
 
 import com.yungnickyoung.minecraft.bettercaves.BetterCaves;
-import com.yungnickyoung.minecraft.bettercaves.noise.NoiseColumn;
+import com.yungnickyoung.minecraft.bettercaves.noise.ColumnNoiseBuffer;
 import com.yungnickyoung.minecraft.bettercaves.noise.NoiseGen;
-import com.yungnickyoung.minecraft.bettercaves.noise.NoiseTuple;
-import com.yungnickyoung.minecraft.bettercaves.util.BetterCavesUtils;
 import com.yungnickyoung.minecraft.bettercaves.world.carver.CarverSettings;
 import com.yungnickyoung.minecraft.bettercaves.world.carver.CarverUtils;
 import com.yungnickyoung.minecraft.bettercaves.world.carver.ICarver;
+import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.init.Blocks;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.world.biome.Biome;
 import net.minecraft.world.chunk.ChunkPrimer;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.Arrays;
 
 /**
  * BetterCaves Cave carver
  */
 public class CaveCarver implements ICarver {
+    private static final int MAX_WORLD_HEIGHT = 256;
+    private static final int MASK_WORDS = 4;
+
     private CarverSettings settings;
     private NoiseGen noiseGen;
-    private World world;
+    private int seaLevel;
 
     /** Surface cutoff depth */
     private int surfaceCutoff;
@@ -47,6 +46,10 @@ public class CaveCarver implements ICarver {
     /** Adjustment value for the block two blocks above. Must be between 0 and 1.0 */
     private float yAdjustF2;
 
+    private final float[][] cachedThresholds = new float[MAX_WORLD_HEIGHT + 1][];
+    private final long[] carveMask = new long[MASK_WORDS];
+    private final long[] adjustedCarveMask = new long[MASK_WORDS];
+
     public CaveCarver(final CaveCarverBuilder builder) {
         settings = builder.getSettings();
         noiseGen = new NoiseGen(
@@ -57,7 +60,7 @@ public class CaveCarver implements ICarver {
                 settings.getyCompression(),
                 settings.getXzCompression()
         );
-        world = builder.getSettings().getWorld();
+        seaLevel = builder.getSettings().getWorld().getSeaLevel();
         surfaceCutoff = builder.getSurfaceCutoff();
         bottomY = builder.getBottomY();
         topY = builder.getTopY();
@@ -72,111 +75,140 @@ public class CaveCarver implements ICarver {
         }
     }
 
-    public void carveColumn(ChunkPrimer primer, BlockPos colPos, int topY, NoiseColumn noises, IBlockState liquidBlock, boolean flooded) {
-        int localX = BetterCavesUtils.getLocal(colPos.getX());
-        int localZ = BetterCavesUtils.getLocal(colPos.getZ());
+    public void carveColumn(ChunkPrimer primer, int localX, int localZ, int topY, ColumnNoiseBuffer noises, int noiseSlot, IBlockState liquidBlock, boolean flooded, Biome biome) {
+        IBlockState airBlockState = Blocks.AIR.getDefaultState();
+        IBlockState airState = Blocks.AIR.getDefaultState();
+        IBlockState waterBlockState = Blocks.WATER.getDefaultState();
+        IBlockState biomeTopState = biome.topBlock;
+        Block biomeTopBlock = biomeTopState.getBlock();
+        Block biomeFillerBlock = biome.fillerBlock.getBlock();
+        int liquidAltitude = settings.getLiquidAltitude();
+        int numGens = settings.getNumGens();
 
-        IBlockState airBlockState;
-
-        // Validate vars
-        if (localX < 0 || localX > 15)
-            return;
-        if (localZ < 0 || localZ > 15)
-            return;
         if (bottomY < 0 || bottomY > 255)
             return;
         if (topY < 0 || topY > 255)
             return;
+        if (topY < bottomY)
+            return;
 
-        // Altitude at which caves start closing off so they aren't all open to the surface
         int transitionBoundary = topY - surfaceCutoff;
-
-        // Validate transition boundary
         if (transitionBoundary < 1)
             transitionBoundary = 1;
 
-        // Pre-compute thresholds to ensure accuracy during pre-processing
-        Map<Integer, Float> thresholds = generateThresholds(topY, bottomY, transitionBoundary);
+        float[] thresholds = getThresholds(topY, bottomY, transitionBoundary);
 
-        // Do some pre-processing on the noises to facilitate better cave generation.
-        // Basically this makes caves taller to give players more headroom.
-        // See the javadoc for the function for more info.
-        if (this.enableYAdjust)
-            preprocessCaveNoiseCol(noises, topY, bottomY, thresholds, settings.getNumGens());
+        float[] noiseValues = noises.values();
+        if (this.enableYAdjust) {
+            carveColumnWithAdjustedMask(primer, localX, localZ, topY, bottomY, thresholds, noises, noiseSlot,
+                noiseValues, numGens, liquidBlock, liquidAltitude, flooded, seaLevel, waterBlockState, airState,
+                biomeTopState, biomeTopBlock, biomeFillerBlock);
+            return;
+        }
 
-        /* =============== Dig out caves and caverns in this column, based on noise values =============== */
         for (int y = topY; y >= bottomY; y--) {
-            if (y <= settings.getLiquidAltitude() && liquidBlock == null)
+            if (y <= liquidAltitude && liquidBlock == null)
                 break;
 
-            List<Double> noiseBlock = noises.get(y).getNoiseValues();
             boolean digBlock = true;
+            float threshold = thresholds[y - bottomY];
+            int noiseIndex = noises.firstIndex(noiseSlot, y);
 
-            for (double noise : noiseBlock) {
-                if (noise < thresholds.get(y)) {
+            for (int i = 0; i < numGens; i++) {
+                if (noiseValues[noiseIndex + i] < threshold) {
                     digBlock = false;
                     break;
                 }
             }
 
-            airBlockState = flooded && y < world.getSeaLevel() ? Blocks.WATER.getDefaultState() : Blocks.AIR.getDefaultState();
-            BlockPos blockPos = new BlockPos(localX, y, localZ);
+            airBlockState = flooded && y < seaLevel ? waterBlockState : airState;
 
-            // Dig out the block if it passed the threshold check, using the debug visualizer if enabled
             if (settings.isEnableDebugVisualizer()) {
-                CarverUtils.debugDigBlock(primer, blockPos, settings.getDebugBlock(), digBlock);
+                CarverUtils.debugDigBlockLocal(primer, localX, y, localZ, settings.getDebugBlock(), digBlock);
             }
             else if (digBlock) {
-                CarverUtils.digBlock(settings.getWorld(), primer, blockPos, airBlockState, liquidBlock, settings.getLiquidAltitude(), settings.isReplaceFloatingGravel());
+                CarverUtils.digBlockLocal(primer, localX, y, localZ, biomeTopState, biomeTopBlock, biomeFillerBlock, airBlockState, liquidBlock, liquidAltitude, settings.isReplaceFloatingGravel());
             }
         }
     }
 
-    /**
-     * Preprocessing performed on a column of noise to adjust its values before comparing them to the threshold.
-     * This function adjusts the noise value of blocks based on the noise values of blocks below.
-     * This has the effect of raising the ceilings of caves, giving the player more headroom.
-     * Big shoutouts to the guys behind Worley's Caves for this great idea.
-     * @param noises The column of noises as a map, mapping the y-coordinate of a block to its NoiseTuple
-     * @param topY Top y-coordinate of the noise column
-     * @param bottomY Bottom y-coordinate of the noise column
-     * @param thresholds Map of y-coordinates to noise thresholds. This is the output of the generateThresholds method.
-     * @param numGens Number of noise values to create per block. This is equal to the number of floats held
-     *                in each NoiseTuple for each block in the noise column.
-     */
-    private void preprocessCaveNoiseCol(NoiseColumn noises, int topY, int bottomY, Map<Integer, Float> thresholds, int numGens) {
-        /* Adjust simplex noise values based on blocks above in order to give the player more headroom */
-        for (int realY = topY; realY >= bottomY; realY--) {
-            NoiseTuple noiseBlock = noises.get(realY);
-            float threshold = thresholds.get(realY);
+    private void carveColumnWithAdjustedMask(ChunkPrimer primer, int localX, int localZ, int topY, int bottomY,
+                                             float[] thresholds, ColumnNoiseBuffer noises, int noiseSlot,
+                                             float[] noiseValues, int numGens, IBlockState liquidBlock,
+                                             int liquidAltitude, boolean flooded, int seaLevel,
+                                             IBlockState waterBlockState, IBlockState airState,
+                                             IBlockState biomeTopState, Block biomeTopBlock,
+                                             Block biomeFillerBlock) {
+        Arrays.fill(carveMask, 0L);
+        Arrays.fill(adjustedCarveMask, 0L);
 
-            boolean valid = true;
-            for (double noise : noiseBlock.getNoiseValues()) {
-                if (noise < threshold) {
-                    valid = false;
+        for (int y = topY; y >= bottomY; y--) {
+            if (y <= liquidAltitude && liquidBlock == null) {
+                break;
+            }
+
+            float threshold = thresholds[y - bottomY];
+            int noiseIndex = noises.firstIndex(noiseSlot, y);
+            boolean digBlock = true;
+
+            for (int i = 0; i < numGens; i++) {
+                if (noiseValues[noiseIndex + i] < threshold) {
+                    digBlock = false;
                     break;
                 }
             }
 
-            // Adjust noise values of blocks above to give the player more head room
-            if (valid) {
-                float f1 = yAdjustF1;
-                float f2 = yAdjustF2;
-
-                // Adjust block one above
-                if (realY < topY) {
-                    NoiseTuple tupleAbove = noises.get(realY + 1);
-                    for (int i = 0; i < numGens; i++)
-                        tupleAbove.set(i, ((1 - f1) * tupleAbove.get(i)) + (f1 * noiseBlock.get(i)));
-                }
-
-                // Adjust block two above
-                if (realY < topY - 1) {
-                    NoiseTuple tupleTwoAbove = noises.get(realY + 2);
-                    for (int i = 0; i < numGens; i++)
-                        tupleTwoAbove.set(i, ((1 - f2) * tupleTwoAbove.get(i)) + (f2 * noiseBlock.get(i)));
-                }
+            if (digBlock) {
+                setMaskBit(carveMask, y - bottomY);
             }
+        }
+
+        copyMask(carveMask, adjustedCarveMask);
+        if (yAdjustF1 > 0) {
+            orShiftedUp(carveMask, adjustedCarveMask, 1);
+        }
+        if (yAdjustF2 > 0) {
+            orShiftedUp(carveMask, adjustedCarveMask, 2);
+        }
+
+        for (int y = topY; y >= bottomY; y--) {
+            if (y <= liquidAltitude && liquidBlock == null) {
+                break;
+            }
+            boolean digBlock = getMaskBit(adjustedCarveMask, y - bottomY);
+            if (settings.isEnableDebugVisualizer()) {
+                CarverUtils.debugDigBlockLocal(primer, localX, y, localZ, settings.getDebugBlock(), digBlock);
+                continue;
+            }
+            if (!digBlock) {
+                continue;
+            }
+
+            IBlockState airBlockState = flooded && y < seaLevel ? waterBlockState : airState;
+            CarverUtils.digBlockLocal(primer, localX, y, localZ, biomeTopState, biomeTopBlock, biomeFillerBlock, airBlockState, liquidBlock, liquidAltitude, settings.isReplaceFloatingGravel());
+        }
+    }
+
+    private static void copyMask(long[] source, long[] target) {
+        for (int i = 0; i < MASK_WORDS; i++) {
+            target[i] = source[i];
+        }
+    }
+
+    private static void setMaskBit(long[] mask, int bitIndex) {
+        mask[bitIndex >> 6] |= 1L << (bitIndex & 63);
+    }
+
+    private static boolean getMaskBit(long[] mask, int bitIndex) {
+        return (mask[bitIndex >> 6] & (1L << (bitIndex & 63))) != 0;
+    }
+
+    private static void orShiftedUp(long[] source, long[] target, int shift) {
+        long carry = 0L;
+        for (int i = 0; i < MASK_WORDS; i++) {
+            long current = source[i];
+            target[i] |= current << shift | carry;
+            carry = current >>> (64 - shift);
         }
     }
 
@@ -187,26 +219,36 @@ public class CaveCarver implements ICarver {
      * @param topY Top y-coordinate of the column
      * @param bottomY Bottom y-coordinate of the column
      * @param transitionBoundary The y-coordinate at which the caves start to close off
-     * @return Map of y-coordinates to noise thresholds
+     * @return Array of y-coordinate noise thresholds, indexed by y - bottomY.
      */
-    private Map<Integer, Float> generateThresholds(int topY, int bottomY, int transitionBoundary) {
-        Map<Integer, Float> thresholds = new HashMap<>();
+    private float[] generateThresholds(int topY, int bottomY, int transitionBoundary) {
+        float[] thresholds = new float[topY - bottomY + 1];
+        int transitionHeight = topY - transitionBoundary;
         for (int realY = bottomY; realY <= topY; realY++) {
             float noiseThreshold = settings.getNoiseThreshold();
-            if (realY >= transitionBoundary)
-                noiseThreshold *= (1 + .3f * ((float)(realY - transitionBoundary) / (topY - transitionBoundary)));
-            thresholds.put(realY, noiseThreshold);
+            if (realY >= transitionBoundary && transitionHeight > 0)
+                noiseThreshold *= (1 + .3f * ((float)(realY - transitionBoundary) / transitionHeight));
+            thresholds[realY - bottomY] = noiseThreshold;
         }
 
         return thresholds;
     }
 
-    public NoiseGen getNoiseGen() {
-        return noiseGen;
+    private float[] getThresholds(int topY, int bottomY, int transitionBoundary) {
+        if (bottomY == this.bottomY && transitionBoundary == topY - surfaceCutoff) {
+            float[] thresholds = cachedThresholds[topY];
+            if (thresholds == null) {
+                thresholds = generateThresholds(topY, bottomY, transitionBoundary);
+                cachedThresholds[topY] = thresholds;
+            }
+            return thresholds;
+        }
+
+        return generateThresholds(topY, bottomY, transitionBoundary);
     }
 
-    public CarverSettings getSettings() {
-        return settings;
+    public NoiseGen getNoiseGen() {
+        return noiseGen;
     }
 
     public int getPriority() {

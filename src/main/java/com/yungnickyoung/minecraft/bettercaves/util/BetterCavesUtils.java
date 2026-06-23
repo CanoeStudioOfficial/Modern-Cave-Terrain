@@ -7,10 +7,8 @@ import net.minecraft.init.Blocks;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
-import net.minecraft.world.biome.Biome;
 import net.minecraft.world.chunk.ChunkPrimer;
-
-import java.util.function.Predicate;
+import net.minecraftforge.common.BiomeDictionary;
 
 /**
  * Utility functions for Better Caves.
@@ -44,19 +42,10 @@ public class BetterCavesUtils {
      * @return The y-coordinate of the surface block
      */
     public static int searchSurfaceAltitudeInRangeForColumn(ChunkPrimer primer, int localX, int localZ, int topY, int bottomY) {
-        // Edge case: blocks go all the way up to build height
-        if (topY == 255
-                && primer.getBlockState(localX, 255, localZ) != Blocks.AIR.getDefaultState()
-                && primer.getBlockState(localX, 255, localZ).getMaterial() != Material.WATER)
-            return 255;
-
-        for (int y = bottomY; y <= topY; y++) {
+        for (int y = topY; y >= bottomY; y--) {
             IBlockState blockState = primer.getBlockState(localX, y, localZ);
-            if (
-                    blockState == Blocks.AIR.getDefaultState()
-                    || blockState.getMaterial() == Material.WATER
-            )
-                return y;
+            if (blockState != Blocks.AIR.getDefaultState() && blockState.getMaterial() != Material.WATER)
+                return Math.min(y + 1, topY);
         }
 
         return 1; // Surface somehow not found
@@ -84,32 +73,39 @@ public class BetterCavesUtils {
         return false;
     }
 
+    public static boolean[] getOceanMaskFlat(World world, int chunkX, int chunkZ, int border) {
+        int width = 16 + border * 2;
+        boolean[] oceanMask = new boolean[width * width];
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        int startX = chunkX * 16 - border;
+        int startZ = chunkZ * 16 - border;
 
-    /**
-     * Returns a linear measure (from 0 to 1, inclusive) indicating how far away a target biome is.
-     * The target biome is searched for in a circle with a given radius centered around the starting block.
-     * The circle is searched radially outward from the starting position, so as not to perform unnecessary computation.
-     *
-     * This function is primarily used to search for nearby ocean/non-ocean biomes to close off flooded caves
-     * from non-flooded caves, preventing weird water walls.
-     *
-     * @param world World
-     * @param pos Center position to search around
-     * @param radius Radius of search circle
-     * @param isTargetBiome Function to use when testing if a given block's biome is the biome we are lookin for
-     */
-    public static float biomeDistanceFactor(World world, BlockPos pos, int radius, Predicate<Biome> isTargetBiome) {
-        BlockPos.MutableBlockPos checkpos = new BlockPos.MutableBlockPos();
+        for (int localX = 0; localX < width; localX++) {
+            for (int localZ = 0; localZ < width; localZ++) {
+                pos.setPos(startX + localX, 1, startZ + localZ);
+                oceanMask[localX * width + localZ] = BiomeDictionary.hasType(world.getBiome(pos), BiomeDictionary.Type.OCEAN);
+            }
+        }
+
+        return oceanMask;
+    }
+
+    public static float biomeDistanceFactor(int localX, int localZ, int radius, boolean[] oceanMask, int width, boolean targetIsOcean) {
+        int centerX = localX + radius;
+        int centerZ = localZ + radius;
+
         for (int i = 1; i <= radius; i++) {
             for (int j = 0; j <= i; j++) {
                 for (EnumFacing direction : EnumFacing.Plane.HORIZONTAL) {
-                    checkpos.setPos(pos).move(direction, i).move(direction.rotateY(), j);
-                    if (isTargetBiome.test(world.getBiome(checkpos))) {
+                    int checkX = centerX + direction.getXOffset() * i + direction.rotateY().getXOffset() * j;
+                    int checkZ = centerZ + direction.getZOffset() * i + direction.rotateY().getZOffset() * j;
+                    if (oceanMask[checkX * width + checkZ] == targetIsOcean) {
                         return (float)(i + j) / (2 * radius);
                     }
                     if (j != 0 && i != j) {
-                        checkpos.setPos(pos).move(direction, i).move(direction.rotateYCCW(), j);
-                        if (isTargetBiome.test(world.getBiome(checkpos))) {
+                        checkX = centerX + direction.getXOffset() * i + direction.rotateYCCW().getXOffset() * j;
+                        checkZ = centerZ + direction.getZOffset() * i + direction.rotateYCCW().getZOffset() * j;
+                        if (oceanMask[checkX * width + checkZ] == targetIsOcean) {
                             return (float)(i + j) / (2 * radius);
                         }
                     }

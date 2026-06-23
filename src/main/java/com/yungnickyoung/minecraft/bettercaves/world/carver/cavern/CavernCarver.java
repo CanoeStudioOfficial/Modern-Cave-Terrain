@@ -2,19 +2,16 @@ package com.yungnickyoung.minecraft.bettercaves.world.carver.cavern;
 
 import com.yungnickyoung.minecraft.bettercaves.BetterCaves;
 import com.yungnickyoung.minecraft.bettercaves.enums.CavernType;
-import com.yungnickyoung.minecraft.bettercaves.noise.NoiseColumn;
+import com.yungnickyoung.minecraft.bettercaves.noise.ColumnNoiseBuffer;
 import com.yungnickyoung.minecraft.bettercaves.noise.NoiseGen;
-import com.yungnickyoung.minecraft.bettercaves.util.BetterCavesUtils;
 import com.yungnickyoung.minecraft.bettercaves.world.carver.CarverSettings;
 import com.yungnickyoung.minecraft.bettercaves.world.carver.CarverUtils;
 import com.yungnickyoung.minecraft.bettercaves.world.carver.ICarver;
+import net.minecraft.block.Block;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.init.Blocks;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.world.biome.Biome;
 import net.minecraft.world.chunk.ChunkPrimer;
-
-import java.util.List;
 
 /**
  * BetterCaves Cavern carver.
@@ -23,7 +20,7 @@ import java.util.List;
 public class CavernCarver implements ICarver {
     private CarverSettings settings;
     private NoiseGen noiseGen;
-    private World world;
+    private int seaLevel;
 
     private CavernType cavernType;
     private int bottomY;
@@ -39,7 +36,7 @@ public class CavernCarver implements ICarver {
                 settings.getyCompression(),
                 settings.getXzCompression()
         );
-        world = builder.getSettings().getWorld();
+        seaLevel = builder.getSettings().getWorld().getSeaLevel();
         cavernType = builder.getCavernType();
         bottomY = builder.getBottomY();
         topY = builder.getTopY();
@@ -51,85 +48,68 @@ public class CavernCarver implements ICarver {
         }
     }
 
-    public void carveColumn(ChunkPrimer primer, BlockPos colPos, int topY, float smoothAmp, NoiseColumn noises, IBlockState liquidBlock, boolean flooded) {
-        int localX = BetterCavesUtils.getLocal(colPos.getX());
-        int localZ = BetterCavesUtils.getLocal(colPos.getZ());
-
+    public void carveColumn(ChunkPrimer primer, int localX, int localZ, int topY, float smoothAmp, ColumnNoiseBuffer noises, int noiseSlot, IBlockState liquidBlock, boolean flooded, Biome biome) {
+        IBlockState airState = Blocks.AIR.getDefaultState();
+        IBlockState waterBlockState = Blocks.WATER.getDefaultState();
         IBlockState airBlockState;
+        IBlockState biomeTopState = biome.topBlock;
+        Block biomeTopBlock = biomeTopState.getBlock();
+        Block biomeFillerBlock = biome.fillerBlock.getBlock();
+        int liquidAltitude = settings.getLiquidAltitude();
+        int numGens = settings.getNumGens();
 
-        // Validate vars
-        if (localX < 0 || localX > 15)
-            return;
-        if (localZ < 0 || localZ > 15)
-            return;
         if (bottomY < 0 || bottomY > 255)
             return;
-        if (topY > 255)
+        if (topY < 0 || topY > 255)
             return;
 
-        // Set altitude at which caverns start closing off on the top
         topY -= 2;
-        int topTransitionBoundary = topY - 6;
+        if (topY < bottomY)
+            return;
 
-        // Set altitude at which caverns start closing off on the bottom
+        int topTransitionBoundary = Math.max(topY - 6, 1);
         int bottomTransitionBoundary = bottomY + 3;
-        if (cavernType == CavernType.FLOORED) { // Close off floored caverns more to create "floors"
-            bottomTransitionBoundary = bottomY < settings.getLiquidAltitude() ? settings.getLiquidAltitude() + 8 : bottomY + 7;
+        if (cavernType == CavernType.FLOORED) {
+            bottomTransitionBoundary = bottomY < liquidAltitude ? liquidAltitude + 8 : bottomY + 7;
         }
-
-        // Validate transition boundaries
-        topTransitionBoundary = Math.max(topTransitionBoundary, 1);
         bottomTransitionBoundary = Math.min(bottomTransitionBoundary, 255);
 
-        /* =============== Dig out caves and caverns in this chunk, based on noise values =============== */
+        float[] noiseValues = noises.values();
+        int topTransitionHeight = topTransitionBoundary - topY;
+        int bottomTransitionHeight = bottomTransitionBoundary - bottomY;
         for (int y = topY; y >= bottomY; y--) {
-            if (y <= settings.getLiquidAltitude() && liquidBlock == null)
+            if (y <= liquidAltitude && liquidBlock == null)
                 break;
 
-            List<Double> noiseBlock;
             boolean digBlock = false;
-
-            // Compute a single noise value to represent all the noise values in the NoiseTuple
             float noise = 1;
-            noiseBlock = noises.get(y).getNoiseValues();
-            for (double n : noiseBlock)
-                noise *= n;
+            int noiseIndex = noises.firstIndex(noiseSlot, y);
+            for (int i = 0; i < numGens; i++)
+                noise *= noiseValues[noiseIndex + i];
 
-            // Adjust threshold if we're in the transition range to provide smoother transition into ceiling
             float noiseThreshold = settings.getNoiseThreshold();
-            if (y >= topTransitionBoundary)
-                noiseThreshold *= (float) (y - topY) / (topTransitionBoundary - topY);
-
-            // Close off caverns at the bottom to hide bedrock and give some walkable area
-            if (y < bottomTransitionBoundary)
-                noiseThreshold *= (float) (y - bottomY) / (bottomTransitionBoundary - bottomY);
-
-            // Adjust threshold along region borders to create smooth transition
+            if (y >= topTransitionBoundary && topTransitionHeight != 0)
+                noiseThreshold *= (float) (y - topY) / topTransitionHeight;
+            if (y < bottomTransitionBoundary && bottomTransitionHeight != 0)
+                noiseThreshold *= (float) (y - bottomY) / bottomTransitionHeight;
             if (smoothAmp < 1)
                 noiseThreshold *= smoothAmp;
 
-            // Mark block for removal if the noise passes the threshold check
             if (noise < noiseThreshold)
                 digBlock = true;
 
-            BlockPos blockPos = new BlockPos(localX, y, localZ);
-            airBlockState = flooded && y < world.getSeaLevel() ? Blocks.WATER.getDefaultState() : Blocks.AIR.getDefaultState();
+            airBlockState = flooded && y < seaLevel ? waterBlockState : airState;
 
-            // Dig out the block if it passed the threshold check, using the debug visualizer if enabled
             if (settings.isEnableDebugVisualizer()) {
-                CarverUtils.debugDigBlock(primer, blockPos, settings.getDebugBlock(), digBlock);
+                CarverUtils.debugDigBlockLocal(primer, localX, y, localZ, settings.getDebugBlock(), digBlock);
             } else if (digBlock) {
-                CarverUtils.digBlock(settings.getWorld(), primer, blockPos, airBlockState, liquidBlock, settings.getLiquidAltitude(), settings.isReplaceFloatingGravel());
+                CarverUtils.digBlockLocal(primer, localX, y, localZ, biomeTopState, biomeTopBlock, biomeFillerBlock, airBlockState, liquidBlock, liquidAltitude, settings.isReplaceFloatingGravel());
             }
         }
     }
 
     public NoiseGen getNoiseGen() {
         return noiseGen;
-    }
-
-    public CarverSettings getSettings() {
-        return settings;
     }
 
     public int getPriority() {

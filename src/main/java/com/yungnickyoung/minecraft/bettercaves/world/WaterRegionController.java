@@ -19,7 +19,6 @@ public class WaterRegionController {
     private long worldSeed;
     private int dimensionID;
     private String dimensionName;
-    private Random rand;
 
     // Vars determined from config
     private IBlockState lavaBlock;
@@ -34,8 +33,6 @@ public class WaterRegionController {
         this.worldSeed = world.getSeed();
         this.dimensionID = world.provider.getDimension();
         this.dimensionName = world.provider.getDimensionType().toString();
-        this.rand = new Random();
-
         // Vars from config
         this.lavaBlock = getLavaBlockFromString(config.lavaBlock.get());
         this.waterBlock = getWaterBlockFromString(config.waterBlock.get());
@@ -48,24 +45,23 @@ public class WaterRegionController {
         this.waterRegionController.SetFrequency(waterRegionSize);
     }
 
-    public IBlockState[][] getLiquidBlocksForChunk(int chunkX, int chunkZ) {
-        rand.setSeed(worldSeed ^ chunkX ^ chunkZ);
-        IBlockState[][] blocks = new IBlockState[16][16];
+    public IBlockState[] getLiquidBlocksFlatForChunk(int chunkX, int chunkZ) {
+        Random rand = new Random(getChunkSeed(chunkX, chunkZ));
+        IBlockState[] blocks = new IBlockState[16 * 16];
+        int baseX = chunkX * 16;
+        int baseZ = chunkZ * 16;
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-                int realX = chunkX * 16 + x;
-                int realZ = chunkZ * 16 + z;
-                BlockPos pos = new BlockPos(realX, 1, realZ);
-                blocks[x][z] = getLiquidBlockAtPos(rand, pos);
+                blocks[x * 16 + z] = getLiquidBlockAtPos(rand, baseX + x, baseZ + z);
             }
         }
         return blocks;
     }
 
-    private IBlockState getLiquidBlockAtPos(Random rand, BlockPos blockPos) {
+    private IBlockState getLiquidBlockAtPos(Random rand, int blockX, int blockZ) {
         IBlockState liquidBlock = lavaBlock;
         if (waterRegionThreshold > -1f) { // Don't bother calculating noise if water regions are disabled
-            float waterRegionNoise = waterRegionController.GetNoise(blockPos.getX(), blockPos.getZ());
+            float waterRegionNoise = waterRegionController.GetNoise(blockX, blockZ);
 
             // If water region threshold check is passed, change liquid block to water
             float randOffset = rand.nextFloat() * SMOOTH_DELTA + SMOOTH_RANGE;
@@ -75,6 +71,18 @@ public class WaterRegionController {
                 liquidBlock = null;
         }
         return liquidBlock;
+    }
+
+    private long getChunkSeed(int chunkX, int chunkZ) {
+        long seed = worldSeed;
+        seed ^= (long)chunkX * 341873128712L;
+        seed ^= (long)chunkZ * 132897987541L;
+        seed ^= seed >>> 33;
+        seed *= 0xff51afd7ed558ccdL;
+        seed ^= seed >>> 33;
+        seed *= 0xc4ceb9fe1a85ec53L;
+        seed ^= seed >>> 33;
+        return seed;
     }
 
     private IBlockState getLavaBlockFromString(String lavaString) {

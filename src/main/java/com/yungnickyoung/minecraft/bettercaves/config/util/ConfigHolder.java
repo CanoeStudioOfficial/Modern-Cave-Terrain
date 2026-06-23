@@ -148,111 +148,6 @@ public class ConfigHolder {
                 .setCategory("general.underground generation.caverns.floored caverns")
                 .addToMap(properties);
 
-        // Modern cave settings
-        enableModernCaves = new ConfigOption<>("Enable Modern Caves", Configuration.caveSettings.modernCaves.enableModernCaves)
-            .setCategory("general.underground generation.modern caves")
-            .addToMap(properties);
-        modernCaveBottom = new ConfigOption<>("Modern Cave Minimum Altitude", Configuration.caveSettings.modernCaves.caveBottom)
-            .setCategory("general.underground generation.modern caves")
-            .addToMap(properties);
-        modernCaveTop = new ConfigOption<>("Modern Cave Maximum Altitude", Configuration.caveSettings.modernCaves.caveTop)
-            .setCategory("general.underground generation.modern caves")
-            .addToMap(properties);
-
-        enableCheeseCaves = new ConfigOption<>("Enable Cheese Caves", Configuration.caveSettings.modernCaves.cheeseCaves.enableCheeseCaves)
-            .setCategory("general.underground generation.modern caves.cheese caves")
-            .addToMap(properties);
-        cheeseCaveSpawnChance = new ConfigOption<>("Cheese Cave Spawn Chance", Configuration.caveSettings.modernCaves.cheeseCaves.spawnChance)
-            .setCategory("general.underground generation.modern caves.cheese caves")
-            .addToMap(properties);
-        cheeseCaveSize = new ConfigOption<>("Cheese Cave Size", Configuration.caveSettings.modernCaves.cheeseCaves.size)
-            .setCategory("general.underground generation.modern caves.cheese caves")
-            .addToMap(properties);
-        cheeseCaveNoiseFrequency = new ConfigOption<>("Cheese Cave Noise Frequency", Configuration.caveSettings.modernCaves.cheeseCaves.noiseFrequency)
-            .setCategory("general.underground generation.modern caves.cheese caves")
-            .addToMap(properties);
-        cheeseCaveNoiseThreshold = new ConfigOption<>("Cheese Cave Noise Threshold", Configuration.caveSettings.modernCaves.cheeseCaves.noiseThreshold)
-            .setCategory("general.underground generation.modern caves.cheese caves")
-            .addToMap(properties);
-        cheeseCaveVerticalStretch = new ConfigOption<>("Cheese Cave Vertical Stretch", Configuration.caveSettings.modernCaves.cheeseCaves.verticalStretch)
-            .setCategory("general.underground generation.modern caves.cheese caves")
-            .addToMap(properties);
-        cheeseCavePerturbAmp = new ConfigOption<>("Cheese Cave Perturb Amp", Configuration.caveSettings.modernCaves.cheeseCaves.perturbAmp)
-            .setCategory("general.underground generation.modern caves.cheese caves")
-            .addToMap(properties);
-        cheeseCavePerturbFrequency = new ConfigOption<>("Cheese Cave Perturb Frequency", Configuration.caveSettings.modernCaves.cheeseCaves.perturbFrequency)
-            .setCategory("general.underground generation.modern caves.cheese caves")
-            .addToMap(properties);
-        cheeseCaveDetailFrequency = new ConfigOption<>("Cheese Cave Detail Frequency", Configuration.caveSettings.modernCaves.cheeseCaves.detailFrequency)
-            .setCategory("general.underground generation.modern caves.cheese caves")
-            .addToMap(properties);
-        cheeseCaveDetailWeight = new ConfigOption<>("Cheese Cave Detail Weight", Configuration.caveSettings.modernCaves.cheeseCaves.detailWeight)
-            .setCategory("general.underground generation.modern caves.cheese caves")
-            .addToMap(properties);
-
-        enableNoodleCaves = new ConfigOption<>("Enable Noodle Caves", Configuration.caveSettings.modernCaves.noodleCaves.enableNoodleCaves)
-            .setCategory("general.underground generation.modern caves.noodle caves")
-            .addToMap(properties);
-        noodleCaveSpawnChance = new ConfigOption<>("Noodle Cave Spawn Chance", Configuration.caveSettings.modernCaves.noodleCaves.spawnChance)
-            .setCategory("general.underground generation.modern caves.noodle caves")
-            .addToMap(properties);
-        noodleCaveThickness = new ConfigOption<>("Noodle Cave Thickness", Configuration.caveSettings.modernCaves.noodleCaves.thickness)
-            .setCategory("general.underground generation.modern caves.noodle caves")
-            .addToMap(properties);
-        noodleCaveNoiseFrequency = new ConfigOption<>("Noodle Cave Noise Frequency", Configuration.caveSettings.modernCaves.noodleCaves.noiseFrequency)
-            .setCategory("general.underground generation.modern caves.noodle caves")
-            .addToMap(properties);
-        noodleCaveVerticalStretch = new ConfigOption<>("Noodle Cave Vertical Stretch", Configuration.caveSettings.modernCaves.noodleCaves.verticalStretch)
-            .setCategory("general.underground generation.modern caves.noodle caves")
-            .addToMap(properties);
-        noodleCavePerturbAmp = new ConfigOption<>("Noodle Cave Perturb Amp", Configuration.caveSettings.modernCaves.noodleCaves.perturbAmp)
-            .setCategory("general.underground generation.modern caves.noodle caves")
-            .addToMap(properties);
-        noodleCavePerturbFrequency = new ConfigOption<>("Noodle Cave Perturb Frequency", Configuration.caveSettings.modernCaves.noodleCaves.perturbFrequency)
-            .setCategory("general.underground generation.modern caves.noodle caves")
-            .addToMap(properties);
-        noodleCaveToggleFrequency = new ConfigOption<>("Noodle Cave Toggle Frequency", Configuration.caveSettings.modernCaves.noodleCaves.toggleFrequency)
-            .setCategory("general.underground generation.modern caves.noodle caves")
-            .addToMap(properties);
-        noodleCaveToggleThreshold = new ConfigOption<>("Noodle Cave Toggle Threshold", Configuration.caveSettings.modernCaves.noodleCaves.toggleThreshold)
-            .setCategory("general.underground generation.modern caves.noodle caves")
-            .addToMap(properties);
-
-        enableSpaghettiCaves = new ConfigOption<>("Enable Spaghetti Caves", Configuration.caveSettings.modernCaves.spaghettiCaves.enableSpaghettiCaves)
-            .setCategory("general.underground generation.modern caves.spaghetti caves")
-            .addToMap(properties);
-        spaghettiCaveSpawnChance = new ConfigOption<>("Spaghetti Cave Spawn Chance", Configuration.caveSettings.modernCaves.spaghettiCaves.spawnChance)
-            .setCategory("general.underground generation.modern caves.spaghetti caves")
-            .addToMap(properties);
-        spaghettiCaveThickness = new ConfigOption<>("Spaghetti Cave Thickness", Configuration.caveSettings.modernCaves.spaghettiCaves.thickness)
-            .setCategory("general.underground generation.modern caves.spaghetti caves")
-            .addToMap(properties);
-        spaghettiCaveNoiseFrequency = new ConfigOption<>("Spaghetti Cave Noise Frequency", Configuration.caveSettings.modernCaves.spaghettiCaves.noiseFrequency)
-            .setCategory("general.underground generation.modern caves.spaghetti caves")
-            .addToMap(properties);
-        spaghettiCaveVerticalStretch = new ConfigOption<>("Spaghetti Cave Vertical Stretch", Configuration.caveSettings.modernCaves.spaghettiCaves.verticalStretch)
-            .setCategory("general.underground generation.modern caves.spaghetti caves")
-            .addToMap(properties);
-        spaghettiCavePerturbAmp = new ConfigOption<>("Spaghetti Cave Perturb Amp", Configuration.caveSettings.modernCaves.spaghettiCaves.perturbAmp)
-            .setCategory("general.underground generation.modern caves.spaghetti caves")
-            .addToMap(properties);
-        spaghettiCavePerturbFrequency = new ConfigOption<>("Spaghetti Cave Perturb Frequency", Configuration.caveSettings.modernCaves.spaghettiCaves.perturbFrequency)
-            .setCategory("general.underground generation.modern caves.spaghetti caves")
-            .addToMap(properties);
-        spaghettiCaveRoughnessFrequency = new ConfigOption<>("Spaghetti Cave Roughness Frequency", Configuration.caveSettings.modernCaves.spaghettiCaves.roughnessFrequency)
-            .setCategory("general.underground generation.modern caves.spaghetti caves")
-            .addToMap(properties);
-
-        enableModernCanyons = new ConfigOption<>("Enable Canyons", Configuration.caveSettings.modernCaves.canyons.enableCanyons)
-            .setCategory("general.underground generation.modern caves.canyons")
-            .addToMap(properties);
-        canyonSpawnChance = new ConfigOption<>("Canyon Spawn Chance", Configuration.caveSettings.modernCaves.canyons.spawnChance)
-            .setCategory("general.underground generation.modern caves.canyons")
-            .addToMap(properties);
-        canyonWidth = new ConfigOption<>("Canyon Width", Configuration.caveSettings.modernCaves.canyons.width)
-            .setCategory("general.underground generation.modern caves.canyons")
-            .addToMap(properties);
-
         // Water region settings
         waterRegionSpawnChance = new ConfigOption<>("Water Region Spawn Chance", Configuration.caveSettings.waterRegions.waterRegionSpawnChance)
             .setCategory("general.underground generation.water regions")
@@ -491,45 +386,6 @@ public class ConfigHolder {
     public ConfigOption<Float>    flooredCavernXZCompression;
     public ConfigOption<Integer>  flooredCavernPriority;
 
-    // Modern cave settings
-    public ConfigOption<Boolean> enableModernCaves;
-    public ConfigOption<Integer> modernCaveBottom;
-    public ConfigOption<Integer> modernCaveTop;
-
-    public ConfigOption<Boolean> enableCheeseCaves;
-    public ConfigOption<Float>   cheeseCaveSpawnChance;
-    public ConfigOption<Float>   cheeseCaveSize;
-    public ConfigOption<Float>   cheeseCaveNoiseFrequency;
-    public ConfigOption<Float>   cheeseCaveNoiseThreshold;
-    public ConfigOption<Float>   cheeseCaveVerticalStretch;
-    public ConfigOption<Float>   cheeseCavePerturbAmp;
-    public ConfigOption<Float>   cheeseCavePerturbFrequency;
-    public ConfigOption<Float>   cheeseCaveDetailFrequency;
-    public ConfigOption<Float>   cheeseCaveDetailWeight;
-
-    public ConfigOption<Boolean> enableNoodleCaves;
-    public ConfigOption<Float>   noodleCaveSpawnChance;
-    public ConfigOption<Float>   noodleCaveThickness;
-    public ConfigOption<Float>   noodleCaveNoiseFrequency;
-    public ConfigOption<Float>   noodleCaveVerticalStretch;
-    public ConfigOption<Float>   noodleCavePerturbAmp;
-    public ConfigOption<Float>   noodleCavePerturbFrequency;
-    public ConfigOption<Float>   noodleCaveToggleFrequency;
-    public ConfigOption<Float>   noodleCaveToggleThreshold;
-
-    public ConfigOption<Boolean> enableSpaghettiCaves;
-    public ConfigOption<Float>   spaghettiCaveSpawnChance;
-    public ConfigOption<Float>   spaghettiCaveThickness;
-    public ConfigOption<Float>   spaghettiCaveNoiseFrequency;
-    public ConfigOption<Float>   spaghettiCaveVerticalStretch;
-    public ConfigOption<Float>   spaghettiCavePerturbAmp;
-    public ConfigOption<Float>   spaghettiCavePerturbFrequency;
-    public ConfigOption<Float>   spaghettiCaveRoughnessFrequency;
-
-    public ConfigOption<Boolean> enableModernCanyons;
-    public ConfigOption<Float>   canyonSpawnChance;
-    public ConfigOption<Float>   canyonWidth;
-
     // Water region settings
     public ConfigOption<Float>      waterRegionSpawnChance;
     public ConfigOption<RegionSize> waterRegionSize;
@@ -595,6 +451,101 @@ public class ConfigHolder {
     public ConfigOption<Float>               flooredCavernFractalFrequency;
     public ConfigOption<Integer>             flooredCavernNumGenerators;
     public ConfigOption<FastNoise.NoiseType> flooredCavernNoiseType;
+
+    public ConfigHolder sanitize() {
+        clampFloat(caveSpawnChance, 0, 100);
+        clampFloat(caveRegionCustomSize, 0, .05f);
+        clampFloat(cavernSpawnChance, 0, 100);
+        clampFloat(cavernRegionCustomSize, 0, .05f);
+        clampFloat(waterRegionSpawnChance, 0, 100);
+        clampFloat(waterRegionCustomSize, 0, .05f);
+
+        clampInt(liquidAltitude, 0, 255);
+        clampInt(bedrockWidth, 0, 256);
+
+        sanitizeCaveSettings(cubicCaveBottom, cubicCaveTop, cubicCaveSurfaceCutoffDepth, cubicCavePriority,
+            cubicCaveYCompression, cubicCaveXZCompression, cubicCaveNoiseThreshold, cubicCaveFractalOctaves,
+            cubicCaveFractalGain, cubicCaveFractalFrequency, cubicCaveNumGenerators, cubicCaveYAdjustF1, cubicCaveYAdjustF2);
+        sanitizeCaveSettings(simplexCaveBottom, simplexCaveTop, simplexCaveSurfaceCutoffDepth, simplexCavePriority,
+            simplexCaveYCompression, simplexCaveXZCompression, simplexCaveNoiseThreshold, simplexCaveFractalOctaves,
+            simplexCaveFractalGain, simplexCaveFractalFrequency, simplexCaveNumGenerators, simplexCaveYAdjustF1, simplexCaveYAdjustF2);
+
+        sanitizeVanillaSettings(surfaceCaveBottom, surfaceCaveTop, surfaceCaveDensity, null);
+        sanitizeVanillaSettings(vanillaCaveBottom, vanillaCaveTop, vanillaCaveDensity, vanillaCavePriority);
+
+        sanitizeCavernSettings(liquidCavernBottom, liquidCavernTop, liquidCavernPriority,
+            liquidCavernYCompression, liquidCavernXZCompression, liquidCavernNoiseThreshold, liquidCavernFractalOctaves,
+            liquidCavernFractalGain, liquidCavernFractalFrequency, liquidCavernNumGenerators);
+        sanitizeCavernSettings(flooredCavernBottom, flooredCavernTop, flooredCavernPriority,
+            flooredCavernYCompression, flooredCavernXZCompression, flooredCavernNoiseThreshold, flooredCavernFractalOctaves,
+            flooredCavernFractalGain, flooredCavernFractalFrequency, flooredCavernNumGenerators);
+
+        return this;
+    }
+
+    private void sanitizeCaveSettings(ConfigOption<Integer> bottomY, ConfigOption<Integer> topY,
+                                      ConfigOption<Integer> surfaceCutoff, ConfigOption<Integer> priority,
+                                      ConfigOption<Float> yCompression, ConfigOption<Float> xzCompression,
+                                      ConfigOption<Float> noiseThreshold, ConfigOption<Integer> fractalOctaves,
+                                      ConfigOption<Float> fractalGain, ConfigOption<Float> fractalFrequency,
+                                      ConfigOption<Integer> numGenerators, ConfigOption<Float> yAdjustF1,
+                                      ConfigOption<Float> yAdjustF2) {
+        normalizeAltitudePair(bottomY, topY);
+        clampInt(surfaceCutoff, 0, 255);
+        clampInt(priority, 0, 10);
+        clampFloat(yCompression, .0001f, 100);
+        clampFloat(xzCompression, .0001f, 100);
+        clampFloat(noiseThreshold, -1, 1);
+        clampInt(fractalOctaves, 1, 8);
+        clampFloat(fractalGain, 0, 1);
+        clampFloat(fractalFrequency, 0, 1);
+        clampInt(numGenerators, 1, 4);
+        clampFloat(yAdjustF1, 0, 1);
+        clampFloat(yAdjustF2, 0, 1);
+    }
+
+    private void sanitizeCavernSettings(ConfigOption<Integer> bottomY, ConfigOption<Integer> topY,
+                                        ConfigOption<Integer> priority, ConfigOption<Float> yCompression,
+                                        ConfigOption<Float> xzCompression, ConfigOption<Float> noiseThreshold,
+                                        ConfigOption<Integer> fractalOctaves, ConfigOption<Float> fractalGain,
+                                        ConfigOption<Float> fractalFrequency, ConfigOption<Integer> numGenerators) {
+        normalizeAltitudePair(bottomY, topY);
+        clampInt(priority, 0, 10);
+        clampFloat(yCompression, .0001f, 100);
+        clampFloat(xzCompression, .0001f, 100);
+        clampFloat(noiseThreshold, -1, 1);
+        clampInt(fractalOctaves, 1, 8);
+        clampFloat(fractalGain, 0, 1);
+        clampFloat(fractalFrequency, 0, 1);
+        clampInt(numGenerators, 1, 4);
+    }
+
+    private void sanitizeVanillaSettings(ConfigOption<Integer> bottomY, ConfigOption<Integer> topY,
+                                         ConfigOption<Integer> density, ConfigOption<Integer> priority) {
+        normalizeAltitudePair(bottomY, topY);
+        clampInt(density, 0, 100);
+        if (priority != null) {
+            clampInt(priority, 0, 10);
+        }
+    }
+
+    private void normalizeAltitudePair(ConfigOption<Integer> bottomY, ConfigOption<Integer> topY) {
+        clampInt(bottomY, 0, 255);
+        clampInt(topY, 0, 255);
+        if (bottomY.get() > topY.get()) {
+            int bottom = bottomY.get();
+            bottomY.set(topY.get());
+            topY.set(bottom);
+        }
+    }
+
+    private void clampInt(ConfigOption<Integer> option, int min, int max) {
+        option.set(Math.max(min, Math.min(max, option.get())));
+    }
+
+    private void clampFloat(ConfigOption<Float> option, float min, float max) {
+        option.set(Math.max(min, Math.min(max, option.get())));
+    }
 
     public static class ConfigOption<T> {
         public String name;
