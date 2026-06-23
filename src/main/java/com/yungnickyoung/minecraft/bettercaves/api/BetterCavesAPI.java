@@ -120,6 +120,26 @@ public final class BetterCavesAPI {
     }
 
     /**
+     * Checks whether 1.18-style density caves are enabled for a dimension.
+     *
+     * @param dimensionId dimension ID
+     * @return true when the effective dimension config gives 1.18-style caves a non-zero priority
+     */
+    public static boolean isMojang118StyleCavesEnabled(int dimensionId) {
+        return getConfigForDimension(dimensionId).isMojang118StyleCavesEnabled();
+    }
+
+    /**
+     * Checks whether 1.18-style density caves are enabled for a world's dimension.
+     *
+     * @param world world instance
+     * @return true when the effective dimension config gives 1.18-style caves a non-zero priority
+     */
+    public static boolean isMojang118StyleCavesEnabled(World world) {
+        return isMojang118StyleCavesEnabled(world.provider.getDimension());
+    }
+
+    /**
      * Gets the Better Caves custom dimension config directory.
      *
      * @return config directory used for dimension-specific Better Caves configs

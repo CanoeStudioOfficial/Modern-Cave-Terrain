@@ -84,6 +84,43 @@ public final class BetterCavesConfig {
         return get(optionName, String.class);
     }
 
+    /**
+     * Checks whether 1.18-style density caves are enabled in this config.
+     *
+     * @return true when the 1.18-style cave priority is greater than zero
+     */
+    public boolean isMojang118StyleCavesEnabled() {
+        return getMojang118StyleCavePriority() > 0;
+    }
+
+    public int getMojang118StyleCavePriority() {
+        return getInt(BetterCavesConfigOptions.MOJANG_118_CAVE_PRIORITY);
+    }
+
+    public int getMojang118StyleCaveBottom() {
+        return getInt(BetterCavesConfigOptions.MOJANG_118_CAVE_BOTTOM);
+    }
+
+    public int getMojang118StyleCaveTop() {
+        return getInt(BetterCavesConfigOptions.MOJANG_118_CAVE_TOP);
+    }
+
+    public int getMojang118StyleCaveSurfaceCutoffDepth() {
+        return getInt(BetterCavesConfigOptions.MOJANG_118_CAVE_SURFACE_CUTOFF_DEPTH);
+    }
+
+    public float getMojang118StyleCaveDensityThreshold() {
+        return getFloat(BetterCavesConfigOptions.MOJANG_118_CAVE_DENSITY_THRESHOLD);
+    }
+
+    public float getMojang118StyleCaveHorizontalScale() {
+        return getFloat(BetterCavesConfigOptions.MOJANG_118_CAVE_HORIZONTAL_SCALE);
+    }
+
+    public float getMojang118StyleCaveVerticalScale() {
+        return getFloat(BetterCavesConfigOptions.MOJANG_118_CAVE_VERTICAL_SCALE);
+    }
+
     ConfigHolder unwrap() {
         return config;
     }

@@ -22,6 +22,14 @@ public final class BetterCavesConfigOptions {
     public static final String SIMPLEX_CAVE_XZ_COMPRESSION = "general.underground generation.caves.type 2 caves.Compression - Horizontal";
     public static final String SIMPLEX_CAVE_PRIORITY = "general.underground generation.caves.type 2 caves.Type 2 Cave Priority";
 
+    public static final String MOJANG_118_CAVE_BOTTOM = "general.underground generation.caves.1 18-style caves.1.18-Style Cave Minimum Altitude";
+    public static final String MOJANG_118_CAVE_TOP = "general.underground generation.caves.1 18-style caves.1.18-Style Cave Maximum Altitude";
+    public static final String MOJANG_118_CAVE_SURFACE_CUTOFF_DEPTH = "general.underground generation.caves.1 18-style caves.1.18-Style Cave Surface Cutoff Depth";
+    public static final String MOJANG_118_CAVE_PRIORITY = "general.underground generation.caves.1 18-style caves.1.18-Style Cave Priority";
+    public static final String MOJANG_118_CAVE_DENSITY_THRESHOLD = "general.underground generation.caves.1 18-style caves.advanced settings.Density Threshold";
+    public static final String MOJANG_118_CAVE_HORIZONTAL_SCALE = "general.underground generation.caves.1 18-style caves.advanced settings.Horizontal Scale";
+    public static final String MOJANG_118_CAVE_VERTICAL_SCALE = "general.underground generation.caves.1 18-style caves.advanced settings.Vertical Scale";
+
     public static final String SURFACE_CAVES_ENABLED = "general.underground generation.caves.surface caves.Enable Surface Caves";
     public static final String SURFACE_CAVE_BOTTOM = "general.underground generation.caves.surface caves.Surface Cave Minimum Altitude";
     public static final String SURFACE_CAVE_TOP = "general.underground generation.caves.surface caves.Surface Cave Maximum Altitude";
