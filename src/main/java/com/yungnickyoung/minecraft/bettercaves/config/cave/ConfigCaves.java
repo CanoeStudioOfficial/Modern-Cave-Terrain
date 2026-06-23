@@ -12,6 +12,10 @@ public class ConfigCaves {
     @Config.Comment("Settings used in the generation of type 2 caves, which tend to be more open and spacious.")
     public ConfigSimplexCave simplexCave = new ConfigSimplexCave();
 
+    @Config.Name("1.18-Style Caves")
+    @Config.Comment("Settings used in the generation of 1.18-style density caves.")
+    public ConfigMojang118Cave mojang118Cave = new ConfigMojang118Cave();
+
     @Config.Name("Surface Caves")
     @Config.Comment("Settings used in the generation of vanilla-like caves near the surface.")
     public ConfigSurfaceCave surfaceCave = new ConfigSurfaceCave();

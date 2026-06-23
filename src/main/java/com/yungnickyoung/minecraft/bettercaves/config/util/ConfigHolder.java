@@ -75,6 +75,20 @@ public class ConfigHolder {
                 .setCategory("general.underground generation.caves.type 2 caves")
                 .addToMap(properties);
 
+        // 1.18-style cave settings
+        mojang118CaveBottom = new ConfigOption<>("1.18-Style Cave Minimum Altitude", Configuration.caveSettings.caves.mojang118Cave.caveBottom)
+                .setCategory("general.underground generation.caves.1 18-style caves")
+                .addToMap(properties);
+        mojang118CaveTop = new ConfigOption<>("1.18-Style Cave Maximum Altitude", Configuration.caveSettings.caves.mojang118Cave.caveTop)
+                .setCategory("general.underground generation.caves.1 18-style caves")
+                .addToMap(properties);
+        mojang118CaveSurfaceCutoffDepth = new ConfigOption<>("1.18-Style Cave Surface Cutoff Depth", Configuration.caveSettings.caves.mojang118Cave.caveSurfaceCutoff)
+                .setCategory("general.underground generation.caves.1 18-style caves")
+                .addToMap(properties);
+        mojang118CavePriority = new ConfigOption<>("1.18-Style Cave Priority", Configuration.caveSettings.caves.mojang118Cave.cavePriority)
+                .setCategory("general.underground generation.caves.1 18-style caves")
+                .addToMap(properties);
+
         // Surface cave settings
         isSurfaceCavesEnabled = new ConfigOption<>("Enable Surface Caves", Configuration.caveSettings.caves.surfaceCave.enableSurfaceCaves)
             .setCategory("general.underground generation.caves.surface caves")
@@ -280,6 +294,20 @@ public class ConfigHolder {
                 .addToMap(properties)
                 .hidden();
 
+        // 1.18-style cave settings
+        mojang118CaveDensityThreshold = new ConfigOption<>("Density Threshold", Configuration.caveSettings.caves.mojang118Cave.advancedSettings.densityThreshold)
+                .setCategory("general.underground generation.caves.1 18-style caves.advanced settings")
+                .addToMap(properties)
+                .hidden();
+        mojang118CaveHorizontalScale = new ConfigOption<>("Horizontal Scale", Configuration.caveSettings.caves.mojang118Cave.advancedSettings.horizontalScale)
+                .setCategory("general.underground generation.caves.1 18-style caves.advanced settings")
+                .addToMap(properties)
+                .hidden();
+        mojang118CaveVerticalScale = new ConfigOption<>("Vertical Scale", Configuration.caveSettings.caves.mojang118Cave.advancedSettings.verticalScale)
+                .setCategory("general.underground generation.caves.1 18-style caves.advanced settings")
+                .addToMap(properties)
+                .hidden();
+
         //  Liquid cavern settings
         liquidCavernNoiseThreshold = new ConfigOption<>("Noise Threshold", Configuration.caveSettings.caverns.liquidCavern.advancedSettings.noiseThreshold)
                 .setCategory("general.underground generation.caverns.liquid caverns.advanced settings")
@@ -354,6 +382,12 @@ public class ConfigHolder {
     public ConfigOption<Float>   simplexCaveYCompression;
     public ConfigOption<Float>   simplexCaveXZCompression;
     public ConfigOption<Integer> simplexCavePriority;
+
+    // 1.18-style cave settings
+    public ConfigOption<Integer> mojang118CaveBottom;
+    public ConfigOption<Integer> mojang118CaveTop;
+    public ConfigOption<Integer> mojang118CaveSurfaceCutoffDepth;
+    public ConfigOption<Integer> mojang118CavePriority;
 
     // Surface cave settings
     public ConfigOption<Boolean> isSurfaceCavesEnabled;
@@ -436,6 +470,11 @@ public class ConfigHolder {
     public ConfigOption<Float>               simplexCaveYAdjustF2;
     public ConfigOption<FastNoise.NoiseType> simplexCaveNoiseType;
 
+    // 1.18-style cave settings
+    public ConfigOption<Float> mojang118CaveDensityThreshold;
+    public ConfigOption<Float> mojang118CaveHorizontalScale;
+    public ConfigOption<Float> mojang118CaveVerticalScale;
+
     // Liquid cavern settings
     public ConfigOption<Float>               liquidCavernNoiseThreshold;
     public ConfigOption<Integer>             liquidCavernFractalOctaves;
@@ -469,6 +508,8 @@ public class ConfigHolder {
         sanitizeCaveSettings(simplexCaveBottom, simplexCaveTop, simplexCaveSurfaceCutoffDepth, simplexCavePriority,
             simplexCaveYCompression, simplexCaveXZCompression, simplexCaveNoiseThreshold, simplexCaveFractalOctaves,
             simplexCaveFractalGain, simplexCaveFractalFrequency, simplexCaveNumGenerators, simplexCaveYAdjustF1, simplexCaveYAdjustF2);
+        sanitizeMojang118CaveSettings(mojang118CaveBottom, mojang118CaveTop, mojang118CaveSurfaceCutoffDepth,
+            mojang118CavePriority, mojang118CaveDensityThreshold, mojang118CaveHorizontalScale, mojang118CaveVerticalScale);
 
         sanitizeVanillaSettings(surfaceCaveBottom, surfaceCaveTop, surfaceCaveDensity, null);
         sanitizeVanillaSettings(vanillaCaveBottom, vanillaCaveTop, vanillaCaveDensity, vanillaCavePriority);
@@ -502,6 +543,18 @@ public class ConfigHolder {
         clampInt(numGenerators, 1, 4);
         clampFloat(yAdjustF1, 0, 1);
         clampFloat(yAdjustF2, 0, 1);
+    }
+
+    private void sanitizeMojang118CaveSettings(ConfigOption<Integer> bottomY, ConfigOption<Integer> topY,
+                                               ConfigOption<Integer> surfaceCutoff, ConfigOption<Integer> priority,
+                                               ConfigOption<Float> densityThreshold, ConfigOption<Float> horizontalScale,
+                                               ConfigOption<Float> verticalScale) {
+        normalizeAltitudePair(bottomY, topY);
+        clampInt(surfaceCutoff, 0, 255);
+        clampInt(priority, 0, 10);
+        clampFloat(densityThreshold, -1, 1);
+        clampFloat(horizontalScale, .25f, 4f);
+        clampFloat(verticalScale, .25f, 4f);
     }
 
     private void sanitizeCavernSettings(ConfigOption<Integer> bottomY, ConfigOption<Integer> topY,

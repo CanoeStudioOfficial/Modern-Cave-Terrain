@@ -11,6 +11,7 @@ import com.yungnickyoung.minecraft.bettercaves.world.carver.CarverNoiseRange;
 import com.yungnickyoung.minecraft.bettercaves.world.carver.ICarver;
 import com.yungnickyoung.minecraft.bettercaves.world.carver.cave.CaveCarver;
 import com.yungnickyoung.minecraft.bettercaves.world.carver.cave.CaveCarverBuilder;
+import com.yungnickyoung.minecraft.bettercaves.world.carver.cave.mojang.Mojang118CaveCarver;
 import com.yungnickyoung.minecraft.bettercaves.world.carver.vanilla.VanillaCaveCarver;
 import com.yungnickyoung.minecraft.bettercaves.world.carver.vanilla.VanillaCaveCarverBuilder;
 import net.minecraft.init.Blocks;
@@ -75,6 +76,8 @@ public class CaveCarverController {
             .debugVisualizerBlock(Blocks.COBBLESTONE.getDefaultState())
             .build()
         );
+        // 1.18-style density caves
+        carvers.add(new Mojang118CaveCarver(worldIn, config));
         // Vanilla caves
         carvers.add(new VanillaCaveCarverBuilder()
             .bottomY(config.vanillaCaveBottom.get())
@@ -90,7 +93,7 @@ public class CaveCarverController {
 
         // Remove carvers with no priority
         carvers.removeIf(carver -> carver.getPriority() == 0);
-        this.hasNonVanillaCaves = carvers.stream().anyMatch(carver -> carver instanceof CaveCarver);
+        this.hasNonVanillaCaves = carvers.stream().anyMatch(this::isColumnCarver);
         if (carvers.isEmpty()) {
             return;
         }
@@ -180,8 +183,8 @@ public class CaveCarverController {
                             if (!range.contains(caveRegionNoise)) {
                                 continue;
                             }
-                            if (range.getCarver() instanceof CaveCarver) {
-                                CaveCarver carver = (CaveCarver) range.getCarver();
+                            if (isColumnCarver(range.getCarver())) {
+                                ICarver carver = range.getCarver();
                                 int surfaceAltitude = chunkContext.getSurfaceAltitude(localX, localZ);
                                 int topY = Math.min(surfaceAltitude, carver.getTopY());
                                 if (isOverrideSurfaceDetectionEnabled) {
@@ -190,7 +193,7 @@ public class CaveCarverController {
                                 if (isDebugViewEnabled) {
                                     topY = 128;
                                 }
-                                if (topY < carver.getBottomY()) {
+                                if (topY < getBottomY(carver)) {
                                     continue;
                                 }
                                 fields.activeRanges[columnIndex] = range;
@@ -255,8 +258,15 @@ public class CaveCarverController {
                     CarverNoiseRange activeRange = fields.activeRanges[columnIndex];
                     int localX = startX + offsetX;
                     int localZ = startZ + offsetZ;
-                    CaveCarver carver = (CaveCarver) activeRange.getCarver();
-                    carver.carveColumn(primer, localX, localZ, fields.topYs[columnIndex], noiseBuffers[fields.rangeIndices[columnIndex]], fields.noiseSlots[columnIndex], chunkContext.getLiquidBlock(localX, localZ), fields.flooded[columnIndex], chunkContext.getBiome(localX, localZ));
+                    ICarver carver = activeRange.getCarver();
+                    if (carver instanceof CaveCarver) {
+                        CaveCarver caveCarver = (CaveCarver) carver;
+                        caveCarver.carveColumn(primer, localX, localZ, fields.topYs[columnIndex], noiseBuffers[fields.rangeIndices[columnIndex]], fields.noiseSlots[columnIndex], chunkContext.getLiquidBlock(localX, localZ), fields.flooded[columnIndex], chunkContext.getBiome(localX, localZ));
+                    }
+                    else if (carver instanceof Mojang118CaveCarver) {
+                        Mojang118CaveCarver mojang118CaveCarver = (Mojang118CaveCarver) carver;
+                        mojang118CaveCarver.carveColumn(primer, localX, localZ, chunkContext.getBlockX(localX), chunkContext.getBlockZ(localZ), fields.topYs[columnIndex], chunkContext.getLiquidBlock(localX, localZ), fields.flooded[columnIndex], chunkContext.getBiome(localX, localZ));
+                    }
                 }
             }
         }
@@ -284,6 +294,21 @@ public class CaveCarverController {
             mask[x] = 0xFFFF;
         }
         return mask;
+    }
+
+    private boolean isColumnCarver(ICarver carver) {
+        return carver instanceof CaveCarver || carver instanceof Mojang118CaveCarver;
+    }
+
+    private int getBottomY(ICarver carver) {
+        if (carver instanceof CaveCarver) {
+            return ((CaveCarver) carver).getBottomY();
+        }
+        if (carver instanceof Mojang118CaveCarver) {
+            return ((Mojang118CaveCarver) carver).getBottomY();
+        }
+
+        return 0;
     }
 
     /**
@@ -323,7 +348,7 @@ public class CaveCarverController {
     public int getMaxSurfaceSearchY() {
         int maxTopY = 0;
         for (CarverNoiseRange range : noiseRanges) {
-            if (range.getCarver() instanceof CaveCarver) {
+            if (isColumnCarver(range.getCarver())) {
                 maxTopY = Math.max(maxTopY, range.getCarver().getTopY());
             }
         }
