@@ -20,7 +20,7 @@ public class EventBetterCaveGen {
         // Replace cave gen with Better Caves
         if (
             (event.getType() == InitMapGenEvent.EventType.CAVE || event.getType() == InitMapGenEvent.EventType.NETHER_CAVE)
-                && !event.getOriginalGen().getClass().getName().equals("com.yungnickyoung.minecraft.bettercaves.world.MapGenBetterCaves")
+                && !BetterCavesAPI.isCaveGenerator(event.getOriginalGen())
         ) {
             event.setNewGen(BetterCavesAPI.createCaveGenerator(event));
         }

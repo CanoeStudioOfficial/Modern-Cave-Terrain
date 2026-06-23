@@ -50,6 +50,16 @@ public final class BetterCavesAPI {
     }
 
     /**
+     * Checks whether a map generator is Better Caves' cave generator.
+     *
+     * @param generator map generator to inspect
+     * @return true when the generator is a Better Caves cave generator
+     */
+    public static boolean isCaveGenerator(MapGenBase generator) {
+        return generator instanceof MapGenBetterCaves;
+    }
+
+    /**
      * Creates a Better Caves mineshaft generator for an {@link InitMapGenEvent}.
      *
      * @param event map generation initialization event
@@ -60,6 +70,16 @@ public final class BetterCavesAPI {
     }
 
     /**
+     * Checks whether a map generator is Better Caves' mineshaft generator.
+     *
+     * @param generator map generator to inspect
+     * @return true when the generator is a Better Caves mineshaft generator
+     */
+    public static boolean isMineshaftGenerator(MapGenBase generator) {
+        return generator instanceof MapGenBetterMineshaft;
+    }
+
+    /**
      * Creates a Better Caves ravine generator for an {@link InitMapGenEvent}.
      *
      * @param event map generation initialization event
@@ -67,6 +87,16 @@ public final class BetterCavesAPI {
      */
     public static MapGenBase createRavineGenerator(InitMapGenEvent event) {
         return new MapGenBetterRavine(event);
+    }
+
+    /**
+     * Checks whether a map generator is Better Caves' ravine generator.
+     *
+     * @param generator map generator to inspect
+     * @return true when the generator is a Better Caves ravine generator
+     */
+    public static boolean isRavineGenerator(MapGenBase generator) {
+        return generator instanceof MapGenBetterRavine;
     }
 
     /**
