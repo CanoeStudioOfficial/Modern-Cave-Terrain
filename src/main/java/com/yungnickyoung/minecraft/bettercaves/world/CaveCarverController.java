@@ -19,6 +19,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.chunk.ChunkPrimer;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class CaveCarverController {
@@ -132,6 +133,9 @@ public class CaveCarverController {
         int chunkZ = chunkContext.getChunkZ();
         boolean flooded;
         boolean shouldCompleteMojang118Aquifers = false;
+        int[] mojang118TopYs = new int[16 * 16];
+        boolean[] mojang118FloodedColumns = new boolean[16 * 16];
+        Arrays.fill(mojang118TopYs, Integer.MIN_VALUE);
 
         // Flag to keep track of whether or not we've already carved vanilla caves for this chunk, since
         // vanilla caves operate on a chunk-by-chunk basis rather than by column
@@ -267,6 +271,9 @@ public class CaveCarverController {
                     else if (carver instanceof Mojang118CaveCarver) {
                         Mojang118CaveCarver mojang118CaveCarver = (Mojang118CaveCarver) carver;
                         mojang118CaveCarver.carveColumn(primer, localX, localZ, chunkContext.getBlockX(localX), chunkContext.getBlockZ(localZ), fields.topYs[columnIndex], chunkContext.getLiquidBlock(localX, localZ), fields.flooded[columnIndex], chunkContext.getBiome(localX, localZ));
+                        int chunkColumnIndex = localX * 16 + localZ;
+                        mojang118TopYs[chunkColumnIndex] = fields.topYs[columnIndex];
+                        mojang118FloodedColumns[chunkColumnIndex] = fields.flooded[columnIndex];
                         shouldCompleteMojang118Aquifers = true;
                     }
                 }
@@ -275,7 +282,7 @@ public class CaveCarverController {
         if (shouldCompleteMojang118Aquifers) {
             for (CarverNoiseRange range : noiseRanges) {
                 if (range.getCarver() instanceof Mojang118CaveCarver) {
-                    ((Mojang118CaveCarver) range.getCarver()).completeAquiferFluidBodies(primer);
+                    ((Mojang118CaveCarver) range.getCarver()).completeAquiferFluidBodies(primer, chunkX * 16, chunkZ * 16, mojang118TopYs, mojang118FloodedColumns);
                 }
             }
         }
