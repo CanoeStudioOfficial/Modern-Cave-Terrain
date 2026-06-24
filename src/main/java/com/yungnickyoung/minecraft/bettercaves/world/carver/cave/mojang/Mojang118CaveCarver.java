@@ -94,6 +94,9 @@ public class Mojang118CaveCarver implements ICarver {
             if (fluidState != null && isDryCaveHorizontallyAdjacent(blockX, y, blockZ, topY, flooded)) {
                 continue;
             }
+            if (fluidState != null && isHorizontalAirAdjacent(primer, localX, y, localZ)) {
+                continue;
+            }
             airBlockState = fluidState == null ? airState : fluidState;
             CarverUtils.digBlockLocal(primer, localX, y, localZ, biome, airBlockState, null, -1, replaceFloatingGravel);
         }
@@ -109,6 +112,8 @@ public class Mojang118CaveCarver implements ICarver {
         completeSampledFluidGaps(primer, baseBlockX, baseBlockZ, topYs, floodedColumns, Blocks.WATER.getDefaultState(), Material.WATER, fillMask);
         Arrays.fill(fillMask, false);
         completeSampledFluidGaps(primer, baseBlockX, baseBlockZ, topYs, floodedColumns, Blocks.LAVA.getDefaultState(), Material.LAVA, fillMask);
+        sealExposedFluidWalls(primer, topYs, floodedColumns, Material.WATER);
+        sealExposedFluidWalls(primer, topYs, floodedColumns, Material.LAVA);
     }
 
     private void completeSampledFluidGaps(ChunkPrimer primer, int baseBlockX, int baseBlockZ, int[] topYs,
@@ -146,6 +151,9 @@ public class Mojang118CaveCarver implements ICarver {
                     if (isDryCaveHorizontallyAdjacent(blockX, y, blockZ, columnTopY, floodedColumns[columnIndex])) {
                         continue;
                     }
+                    if (isHorizontalAirAdjacent(primer, localX, y, localZ)) {
+                        continue;
+                    }
 
                     fillMask[index(localX, y, localZ)] = true;
                 }
@@ -158,6 +166,44 @@ public class Mojang118CaveCarver implements ICarver {
                     int index = index(localX, y, localZ);
                     if (fillMask[index]) {
                         primer.setBlockState(localX, y, localZ, fluidState);
+                    }
+                }
+            }
+        }
+    }
+
+    private void sealExposedFluidWalls(ChunkPrimer primer, int[] topYs, boolean[] floodedColumns, Material fluidMaterial) {
+        boolean[] sealMask = new boolean[FLUID_FILL_VOLUME];
+        int minY = Math.max(0, bottomY);
+
+        for (int localX = 0; localX < CHUNK_SIZE; localX++) {
+            for (int localZ = 0; localZ < CHUNK_SIZE; localZ++) {
+                int columnIndex = columnIndex(localX, localZ);
+                if (floodedColumns[columnIndex] || topYs[columnIndex] < minY) {
+                    continue;
+                }
+
+                int maxY = Math.min(Math.min(WORLD_HEIGHT - 1, topY), topYs[columnIndex]);
+                for (int y = minY; y <= maxY; y++) {
+                    if (primer.getBlockState(localX, y, localZ).getMaterial() != fluidMaterial) {
+                        continue;
+                    }
+
+                    boolean unsupportedBelow = y > 0 && (primer.getBlockState(localX, y - 1, localZ).getMaterial() == Material.AIR
+                            || sealMask[index(localX, y - 1, localZ)]);
+                    if (unsupportedBelow || isHorizontalAirAdjacent(primer, localX, y, localZ)) {
+                        sealMask[index(localX, y, localZ)] = true;
+                    }
+                }
+            }
+        }
+
+        IBlockState stoneState = Blocks.STONE.getDefaultState();
+        for (int localX = 0; localX < CHUNK_SIZE; localX++) {
+            for (int localZ = 0; localZ < CHUNK_SIZE; localZ++) {
+                for (int y = minY; y < WORLD_HEIGHT; y++) {
+                    if (sealMask[index(localX, y, localZ)]) {
+                        primer.setBlockState(localX, y, localZ, stoneState);
                     }
                 }
             }
@@ -179,6 +225,21 @@ public class Mojang118CaveCarver implements ICarver {
         }
 
         return primer.getBlockState(localX, y, localZ).getMaterial() == fluidMaterial;
+    }
+
+    private boolean isHorizontalAirAdjacent(ChunkPrimer primer, int localX, int y, int localZ) {
+        return isAir(primer, localX + 1, y, localZ)
+                || isAir(primer, localX - 1, y, localZ)
+                || isAir(primer, localX, y, localZ + 1)
+                || isAir(primer, localX, y, localZ - 1);
+    }
+
+    private boolean isAir(ChunkPrimer primer, int localX, int y, int localZ) {
+        if (localX < 0 || localX >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || localZ < 0 || localZ >= CHUNK_SIZE) {
+            return false;
+        }
+
+        return primer.getBlockState(localX, y, localZ).getMaterial() == Material.AIR;
     }
 
     private int columnIndex(int localX, int localZ) {
