@@ -29,10 +29,10 @@ public class Mojang118AquiferSampler {
     }
 
     public IBlockState sampleFluidState(int blockX, int blockY, int blockZ, int surfaceY, int seaLevel,
-                                        IBlockState columnLiquidBlock, boolean flooded) {
+                                        boolean flooded) {
         double mojangY = toMojangY(blockY);
         if (mojangY <= MODERN_LAVA_LEVEL) {
-            return lavaState(columnLiquidBlock);
+            return Blocks.LAVA.getDefaultState();
         }
 
         int surfaceMojangY = (int) Math.floor(toMojangY(surfaceY));
@@ -42,7 +42,7 @@ public class Mojang118AquiferSampler {
             return null;
         }
 
-        return computeFluidType(blockX, mojangY, blockZ, columnLiquidBlock, fluidLevel);
+        return computeFluidType(blockX, mojangY, blockZ, fluidLevel);
     }
 
     private int computeSurfaceLevel(int blockX, double mojangY, int blockZ, int surfaceMojangY,
@@ -77,27 +77,18 @@ public class Mojang118AquiferSampler {
         return Math.min(surfaceMojangY, targetFluidSurfaceLevel);
     }
 
-    private IBlockState computeFluidType(int blockX, double mojangY, int blockZ, IBlockState columnLiquidBlock,
-                                         int fluidSurfaceLevel) {
+    private IBlockState computeFluidType(int blockX, double mojangY, int blockZ, int fluidSurfaceLevel) {
         if (fluidSurfaceLevel <= -10) {
             int cellX = floorDiv(blockX, 64);
             int cellY = floorDiv((int) Math.floor(mojangY), 40);
             int cellZ = floorDiv(blockZ, 64);
             double lavaNoiseValue = lavaNoise.getValue(cellX, cellY, cellZ);
             if (Math.abs(lavaNoiseValue) > 0.3D) {
-                return lavaState(columnLiquidBlock);
+                return Blocks.LAVA.getDefaultState();
             }
         }
 
         return Blocks.WATER.getDefaultState();
-    }
-
-    private IBlockState lavaState(IBlockState columnLiquidBlock) {
-        if (columnLiquidBlock != null && columnLiquidBlock.getMaterial().isLiquid()) {
-            return columnLiquidBlock;
-        }
-
-        return Blocks.LAVA.getDefaultState();
     }
 
     private double sample(MojangNormalNoise noise, int blockX, double mojangY, int blockZ, double xzScale, double yScale) {
