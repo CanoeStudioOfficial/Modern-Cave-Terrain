@@ -91,6 +91,9 @@ public class Mojang118CaveCarver implements ICarver {
             if (fluidState != null && isOppositeFluidAdjacent(primer, localX, y, localZ, fluidState)) {
                 continue;
             }
+            if (fluidState != null && isDryCaveHorizontallyAdjacent(blockX, y, blockZ, topY, flooded)) {
+                continue;
+            }
             airBlockState = fluidState == null ? airState : fluidState;
             CarverUtils.digBlockLocal(primer, localX, y, localZ, biome, airBlockState, null, -1, replaceFloatingGravel);
         }
@@ -140,6 +143,9 @@ public class Mojang118CaveCarver implements ICarver {
                     if (isOppositeFluidAdjacent(primer, localX, y, localZ, fluidState)) {
                         continue;
                     }
+                    if (isDryCaveHorizontallyAdjacent(blockX, y, blockZ, columnTopY, floodedColumns[columnIndex])) {
+                        continue;
+                    }
 
                     fillMask[index(localX, y, localZ)] = true;
                 }
@@ -181,6 +187,29 @@ public class Mojang118CaveCarver implements ICarver {
 
     private int index(int localX, int y, int localZ) {
         return (localX * WORLD_HEIGHT + y) * CHUNK_SIZE + localZ;
+    }
+
+    private boolean isDryCaveHorizontallyAdjacent(int blockX, int y, int blockZ, int topY, boolean flooded) {
+        return isDryCave(blockX + 1, y, blockZ, topY, flooded)
+                || isDryCave(blockX - 1, y, blockZ, topY, flooded)
+                || isDryCave(blockX, y, blockZ + 1, topY, flooded)
+                || isDryCave(blockX, y, blockZ - 1, topY, flooded);
+    }
+
+    private boolean isDryCave(int blockX, int y, int blockZ, int topY, boolean flooded) {
+        double density = densitySampler.sampleDensity(blockX, y, blockZ);
+        int transitionBoundary = Math.max(bottomY, topY - surfaceCutoff);
+        if (y >= transitionBoundary) {
+            int transitionHeight = Math.max(1, topY - transitionBoundary);
+            double surfaceFactor = (double) (y - transitionBoundary) / transitionHeight;
+            density += surfaceFactor * 0.45D;
+        }
+
+        if (density > densityThreshold) {
+            return false;
+        }
+
+        return !(flooded && y < seaLevel) && aquiferSampler.sampleFluidState(blockX, y, blockZ, topY, seaLevel, flooded) == null;
     }
 
     private boolean isOppositeFluidAdjacent(ChunkPrimer primer, int localX, int y, int localZ, IBlockState fluidState) {
