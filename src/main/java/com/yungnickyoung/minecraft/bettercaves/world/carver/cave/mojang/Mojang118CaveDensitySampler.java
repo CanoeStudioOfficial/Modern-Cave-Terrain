@@ -1,39 +1,39 @@
 package com.yungnickyoung.minecraft.bettercaves.world.carver.cave.mojang;
 
-import com.yungnickyoung.minecraft.bettercaves.noise.OpenSimplex2S;
+import com.yungnickyoung.minecraft.bettercaves.noise.MojangNormalNoise;
 
 /**
  * A Java 8-friendly approximation of the 1.18 overworld cave density graph.
  *
  * <p>The function layout follows Mojang's cheese, spaghetti, noodle and pillar density functions. The
- * underlying sampler uses the OpenSimplex implementation already bundled with Better Caves rather than
- * Mojang's NormalNoise so it can live cleanly in the 1.12.2 codebase.</p>
+ * underlying sampler uses a Java 8-friendly subset of Mojang's NormalNoise stack so it can live cleanly in
+ * the 1.12.2 codebase.</p>
  */
 public class Mojang118CaveDensitySampler {
     private static final double MOJANG_MIN_Y = -64.0D;
     private static final double MOJANG_HEIGHT = 384.0D;
     private static final double OLD_WORLD_MAX_Y = 255.0D;
 
-    private final OctaveNoise caveCheese;
-    private final OctaveNoise caveLayer;
-    private final OctaveNoise caveEntrance;
-    private final OctaveNoise spaghetti2D;
-    private final OctaveNoise spaghetti2DElevation;
-    private final OctaveNoise spaghetti2DModulator;
-    private final OctaveNoise spaghetti2DThickness;
-    private final OctaveNoise spaghetti3D1;
-    private final OctaveNoise spaghetti3D2;
-    private final OctaveNoise spaghetti3DRarity;
-    private final OctaveNoise spaghetti3DThickness;
-    private final OctaveNoise spaghettiRoughness;
-    private final OctaveNoise spaghettiRoughnessModulator;
-    private final OctaveNoise noodle;
-    private final OctaveNoise noodleThickness;
-    private final OctaveNoise noodleRidgeA;
-    private final OctaveNoise noodleRidgeB;
-    private final OctaveNoise pillar;
-    private final OctaveNoise pillarRareness;
-    private final OctaveNoise pillarThickness;
+    private final MojangNormalNoise caveCheese;
+    private final MojangNormalNoise caveLayer;
+    private final MojangNormalNoise caveEntrance;
+    private final MojangNormalNoise spaghetti2D;
+    private final MojangNormalNoise spaghetti2DElevation;
+    private final MojangNormalNoise spaghetti2DModulator;
+    private final MojangNormalNoise spaghetti2DThickness;
+    private final MojangNormalNoise spaghetti3D1;
+    private final MojangNormalNoise spaghetti3D2;
+    private final MojangNormalNoise spaghetti3DRarity;
+    private final MojangNormalNoise spaghetti3DThickness;
+    private final MojangNormalNoise spaghettiRoughness;
+    private final MojangNormalNoise spaghettiRoughnessModulator;
+    private final MojangNormalNoise noodle;
+    private final MojangNormalNoise noodleThickness;
+    private final MojangNormalNoise noodleRidgeA;
+    private final MojangNormalNoise noodleRidgeB;
+    private final MojangNormalNoise pillar;
+    private final MojangNormalNoise pillarRareness;
+    private final MojangNormalNoise pillarThickness;
 
     private final double horizontalScale;
     private final double verticalScale;
@@ -68,7 +68,9 @@ public class Mojang118CaveDensitySampler {
         double mojangY = toMojangY(blockY);
         double slopedCheese = slopedCheese(blockX, mojangY, blockZ);
         double surfaceWithEntrances = Math.min(slopedCheese, 5.0D * entrances(blockX, mojangY, blockZ));
-        double caves = Math.min(surfaceWithEntrances, underground(blockX, mojangY, blockZ, slopedCheese));
+        double caves = slopedCheese < 1.5625D
+                ? surfaceWithEntrances
+                : underground(blockX, mojangY, blockZ, slopedCheese);
         double fullNoise = Math.min(postProcess(slideOverworld(mojangY, caves)), noodle(blockX, mojangY, blockZ));
 
         return fullNoise;
@@ -81,9 +83,9 @@ public class Mojang118CaveDensitySampler {
     }
 
     private double underground(int blockX, double mojangY, int blockZ, double slopedCheese) {
-        double layerNoise = sample(caveLayer, blockX, mojangY, blockZ, 8.0D, 8.0D);
+        double layerNoise = sample(caveLayer, blockX, mojangY, blockZ, 1.0D, 8.0D);
         double layerizedCaverns = 4.0D * layerNoise * layerNoise;
-        double cheese = sample(caveCheese, blockX, mojangY, blockZ, 0.6666666666666666D, 0.6666666666666666D);
+        double cheese = sample(caveCheese, blockX, mojangY, blockZ, 1.0D, 0.6666666666666666D);
         double solidifiedCheese = clamp(0.27D + cheese, -1.0D, 1.0D)
                 + clamp(1.5D - 0.64D * slopedCheese, 0.0D, 0.5D);
         double baseCaveDensity = layerizedCaverns + solidifiedCheese;
@@ -168,7 +170,7 @@ public class Mojang118CaveDensitySampler {
         return scaledSpaghetti(spaghetti2D, blockX, mojangY, blockZ, 3.0D);
     }
 
-    private double quantizedSpaghetti3D(double rarity, OctaveNoise noise, int blockX, double mojangY, int blockZ) {
+    private double quantizedSpaghetti3D(double rarity, MojangNormalNoise noise, int blockX, double mojangY, int blockZ) {
         if (rarity < -0.5D) {
             return scaledSpaghetti(noise, blockX, mojangY, blockZ, 0.75D);
         }
@@ -182,7 +184,7 @@ public class Mojang118CaveDensitySampler {
         return scaledSpaghetti(noise, blockX, mojangY, blockZ, 2.0D);
     }
 
-    private double scaledSpaghetti(OctaveNoise noise, int blockX, double mojangY, int blockZ, double rarity) {
+    private double scaledSpaghetti(MojangNormalNoise noise, int blockX, double mojangY, int blockZ, double rarity) {
         return Math.abs(rarity * sample(noise, blockX, mojangY, blockZ, 1.0D / rarity, 1.0D / rarity));
     }
 
@@ -203,23 +205,23 @@ public class Mojang118CaveDensitySampler {
         return squeeze(density * 0.64D);
     }
 
-    private double mappedNoise(OctaveNoise noise, int blockX, double mojangY, int blockZ, double xzScale,
+    private double mappedNoise(MojangNormalNoise noise, int blockX, double mojangY, int blockZ, double xzScale,
                                double yScale, double min, double max) {
         double value = sample(noise, blockX, mojangY, blockZ, xzScale, yScale);
 
         return (min + max) * 0.5D + (max - min) * 0.5D * value;
     }
 
-    private double sample(OctaveNoise noise, int blockX, double mojangY, int blockZ, double xzScale, double yScale) {
+    private double sample(MojangNormalNoise noise, int blockX, double mojangY, int blockZ, double xzScale, double yScale) {
         double x = blockX * xzScale * horizontalScale;
         double y = mojangY * yScale * verticalScale;
         double z = blockZ * xzScale * horizontalScale;
 
-        return noise.sample(x, y, z);
+        return noise.getValue(x, y, z);
     }
 
-    private static OctaveNoise noise(long seed, String name, int firstOctave, double... amplitudes) {
-        return new OctaveNoise(seed ^ hash(name), firstOctave, amplitudes);
+    private static MojangNormalNoise noise(long seed, String name, int firstOctave, double... amplitudes) {
+        return MojangNormalNoise.create(seed, name, firstOctave, amplitudes);
     }
 
     private static double toMojangY(int blockY) {
@@ -255,47 +257,4 @@ public class Mojang118CaveDensitySampler {
         return Math.max(min, Math.min(max, value));
     }
 
-    private static long hash(String name) {
-        long hash = 1469598103934665603L;
-        for (int i = 0; i < name.length(); i++) {
-            hash ^= name.charAt(i);
-            hash *= 1099511628211L;
-        }
-
-        return hash;
-    }
-
-    private static class OctaveNoise {
-        private final OpenSimplex2S[] octaves;
-        private final double[] amplitudes;
-        private final double firstFrequency;
-        private final double normalizer;
-
-        private OctaveNoise(long seed, int firstOctave, double[] amplitudes) {
-            this.octaves = new OpenSimplex2S[amplitudes.length];
-            this.amplitudes = amplitudes;
-            this.firstFrequency = Math.pow(2.0D, firstOctave);
-
-            double amplitudeSum = 0.0D;
-            for (int i = 0; i < amplitudes.length; i++) {
-                this.octaves[i] = new OpenSimplex2S(seed + 0x9E3779B97F4A7C15L * (i + 1));
-                amplitudeSum += Math.abs(amplitudes[i]);
-            }
-            this.normalizer = amplitudeSum == 0.0D ? 1.0D : amplitudeSum;
-        }
-
-        private double sample(double x, double y, double z) {
-            double sum = 0.0D;
-            double frequency = firstFrequency;
-            for (int i = 0; i < amplitudes.length; i++) {
-                double amplitude = amplitudes[i];
-                if (amplitude != 0.0D) {
-                    sum += amplitude * octaves[i].noise3_XZBeforeY(x * frequency, y * frequency, z * frequency);
-                }
-                frequency *= 2.0D;
-            }
-
-            return sum / normalizer;
-        }
-    }
 }

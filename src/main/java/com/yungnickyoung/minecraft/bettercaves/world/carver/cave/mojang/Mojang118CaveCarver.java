@@ -15,11 +15,11 @@ import net.minecraft.world.chunk.ChunkPrimer;
  */
 public class Mojang118CaveCarver implements ICarver {
     private final Mojang118CaveDensitySampler densitySampler;
+    private final Mojang118AquiferSampler aquiferSampler;
     private final int bottomY;
     private final int topY;
     private final int surfaceCutoff;
     private final int priority;
-    private final int liquidAltitude;
     private final int seaLevel;
     private final double densityThreshold;
     private final boolean replaceFloatingGravel;
@@ -31,7 +31,6 @@ public class Mojang118CaveCarver implements ICarver {
         this.topY = config.mojang118CaveTop.get();
         this.surfaceCutoff = config.mojang118CaveSurfaceCutoffDepth.get();
         this.priority = config.mojang118CavePriority.get();
-        this.liquidAltitude = config.liquidAltitude.get();
         this.seaLevel = world.getSeaLevel();
         this.densityThreshold = config.mojang118CaveDensityThreshold.get();
         this.replaceFloatingGravel = config.replaceFloatingGravel.get();
@@ -42,6 +41,7 @@ public class Mojang118CaveCarver implements ICarver {
                 config.mojang118CaveHorizontalScale.get(),
                 config.mojang118CaveVerticalScale.get()
         );
+        this.aquiferSampler = new Mojang118AquiferSampler(world.getSeed());
 
         if (bottomY > topY) {
             BetterCaves.LOGGER.warn("Warning: Min altitude for 1.18-style caves should not be greater than max altitude.");
@@ -57,14 +57,11 @@ public class Mojang118CaveCarver implements ICarver {
         IBlockState airState = Blocks.AIR.getDefaultState();
         IBlockState waterState = Blocks.WATER.getDefaultState();
         IBlockState airBlockState;
+        IBlockState fluidState;
         int transitionBoundary = Math.max(bottomY, topY - surfaceCutoff);
         int transitionHeight = Math.max(1, topY - transitionBoundary);
 
         for (int y = topY; y >= bottomY; y--) {
-            if (y <= liquidAltitude && liquidBlock == null) {
-                break;
-            }
-
             double density = densitySampler.sampleDensity(blockX, y, blockZ);
             if (y >= transitionBoundary) {
                 double surfaceFactor = (double) (y - transitionBoundary) / transitionHeight;
@@ -81,8 +78,11 @@ public class Mojang118CaveCarver implements ICarver {
                 continue;
             }
 
-            airBlockState = flooded && y < seaLevel ? waterState : airState;
-            CarverUtils.digBlockLocal(primer, localX, y, localZ, biome, airBlockState, liquidBlock, liquidAltitude, replaceFloatingGravel);
+            fluidState = flooded && y < seaLevel
+                    ? waterState
+                    : aquiferSampler.sampleFluidState(blockX, y, blockZ, topY, seaLevel, liquidBlock, flooded);
+            airBlockState = fluidState == null ? airState : fluidState;
+            CarverUtils.digBlockLocal(primer, localX, y, localZ, biome, airBlockState, null, -1, replaceFloatingGravel);
         }
     }
 
