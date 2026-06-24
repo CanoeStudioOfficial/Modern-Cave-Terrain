@@ -14,26 +14,26 @@ public class ConfigMojang118Cave {
     @Config.Name("1.18-Style Cave Maximum Altitude")
     @Config.Comment(
             "The maximum y-coordinate at which 1.18-style density caves can generate.\n" +
-            "Default: 128")
+            "Default: 255")
     @Config.RangeInt(min = 0, max = 255)
     @Config.RequiresWorldRestart
-    public int caveTop = 128;
+    public int caveTop = 255;
 
     @Config.Name("1.18-Style Cave Surface Cutoff Depth")
     @Config.Comment(
             "The depth from a given point on the surface at which 1.18-style caves start to close off.\n" +
-            "Default: 18")
+            "Default: 8")
     @Config.RangeInt(min = 0, max = 255)
     @Config.RequiresWorldRestart
-    public int caveSurfaceCutoff = 18;
+    public int caveSurfaceCutoff = 8;
 
     @Config.Name("1.18-Style Cave Priority")
     @Config.Comment(
             "Determines how frequently 1.18-style density caves spawn. 0 = will not spawn at all.\n" +
-            "Default: 0")
+            "Default: 10")
     @Config.RangeInt(min = 0, max = 10)
     @Config.RequiresWorldRestart
-    public int cavePriority = 0;
+    public int cavePriority = 10;
 
     @Config.Ignore
     @Config.Name("Advanced Settings")

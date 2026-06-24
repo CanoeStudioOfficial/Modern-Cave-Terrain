@@ -19,10 +19,10 @@ public class ConfigCaverns {
     @Config.Name("Cavern Spawn Chance")
     @Config.Comment(
             "Percent chance of caverns spawning in a given region.\n" +
-            "Default: caverns spawn in 25% of regions.")
+            "Default: caverns spawn in 0% of regions.")
     @Config.RangeDouble(min = 0, max = 100)
     @Config.RequiresWorldRestart
-    public float cavernSpawnChance = 25;
+    public float cavernSpawnChance = 0;
 
     @Config.Name("Cavern Region Size")
     @Config.Comment(

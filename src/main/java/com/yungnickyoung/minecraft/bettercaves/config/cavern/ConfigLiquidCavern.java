@@ -40,10 +40,10 @@ public class ConfigLiquidCavern {
     @Config.Name("Liquid Cavern Priority")
     @Config.Comment(
             "Determines how frequently Liquid Caverns spawn. 0 = will not spawn at all.\n" +
-            "Default: 10")
+            "Default: 0")
     @Config.RangeInt(min = 0, max = 10)
     @Config.RequiresWorldRestart
-    public int cavernPriority = 10;
+    public int cavernPriority = 0;
 
     @Config.Ignore
     @Config.Name("Advanced Settings")

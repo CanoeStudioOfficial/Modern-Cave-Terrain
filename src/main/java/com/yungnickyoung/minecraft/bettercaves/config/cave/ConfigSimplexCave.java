@@ -49,10 +49,10 @@ public class ConfigSimplexCave {
     @Config.Name("Type 2 Cave Priority")
     @Config.Comment(
             "Determines how frequently Type 2 Caves spawn. 0 = will not spawn at all.\n" +
-            "Default: 5")
+            "Default: 0")
     @Config.RangeInt(min = 0, max = 10)
     @Config.RequiresWorldRestart
-    public int cavePriority = 5;
+    public int cavePriority = 0;
 
     @Config.Ignore
     @Config.Name("Advanced Settings")

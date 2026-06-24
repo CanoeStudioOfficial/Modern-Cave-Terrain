@@ -49,10 +49,10 @@ public class ConfigCubicCave {
     @Config.Name("Type 1 Cave Priority")
     @Config.Comment(
             "Determines how frequently Type 1 Caves spawn. 0 = will not spawn at all.\n" +
-            "Default: 10")
+            "Default: 0")
     @Config.RangeInt(min = 0, max = 10)
     @Config.RequiresWorldRestart
-    public int cavePriority = 10;
+    public int cavePriority = 0;
 
     @Config.Ignore
     @Config.Name("Advanced Settings")

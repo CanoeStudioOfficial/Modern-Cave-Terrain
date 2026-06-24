@@ -6,10 +6,10 @@ public class ConfigMisc {
     @Config.Name("Liquid Altitude")
     @Config.Comment(
         "Lava (or water in water regions) spawns at and below this y-coordinate.\n" +
-        "Default: 10")
+        "Default: 6")
     @Config.RangeInt(min = 0, max = 255)
     @Config.RequiresWorldRestart
-    public int liquidAltitude = 10;
+    public int liquidAltitude = 6;
 
     @Config.Name("Lava Block")
     @Config.Comment(

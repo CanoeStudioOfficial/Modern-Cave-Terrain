@@ -76,7 +76,7 @@ public class Mojang118CaveDensitySampler {
 
     private double slopedCheese(int blockX, double mojangY, int blockZ) {
         double heightGradient = yClampedGradient(mojangY, -64, 320, 1.5D, -1.5D);
-        double baseNoise = sample(caveCheese, blockX, mojangY, blockZ, 0.6666666666666666D, 0.6666666666666666D);
+        double baseNoise = sample(caveCheese, blockX, mojangY, blockZ, 1.0D, 0.6666666666666666D);
         return heightGradient + baseNoise * 0.35D;
     }
 
