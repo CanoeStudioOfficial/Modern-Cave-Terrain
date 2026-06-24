@@ -131,6 +131,7 @@ public class CaveCarverController {
         int chunkX = chunkContext.getChunkX();
         int chunkZ = chunkContext.getChunkZ();
         boolean flooded;
+        boolean shouldCompleteMojang118Aquifers = false;
 
         // Flag to keep track of whether or not we've already carved vanilla caves for this chunk, since
         // vanilla caves operate on a chunk-by-chunk basis rather than by column
@@ -266,7 +267,15 @@ public class CaveCarverController {
                     else if (carver instanceof Mojang118CaveCarver) {
                         Mojang118CaveCarver mojang118CaveCarver = (Mojang118CaveCarver) carver;
                         mojang118CaveCarver.carveColumn(primer, localX, localZ, chunkContext.getBlockX(localX), chunkContext.getBlockZ(localZ), fields.topYs[columnIndex], chunkContext.getLiquidBlock(localX, localZ), fields.flooded[columnIndex], chunkContext.getBiome(localX, localZ));
+                        shouldCompleteMojang118Aquifers = true;
                     }
+                }
+            }
+        }
+        if (shouldCompleteMojang118Aquifers) {
+            for (CarverNoiseRange range : noiseRanges) {
+                if (range.getCarver() instanceof Mojang118CaveCarver) {
+                    ((Mojang118CaveCarver) range.getCarver()).completeAquiferFluidBodies(primer);
                 }
             }
         }

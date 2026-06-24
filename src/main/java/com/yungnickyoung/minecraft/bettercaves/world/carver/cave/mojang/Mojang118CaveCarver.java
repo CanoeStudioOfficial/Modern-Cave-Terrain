@@ -11,10 +11,16 @@ import net.minecraft.world.World;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.chunk.ChunkPrimer;
 
+import java.util.Arrays;
+
 /**
  * Carves a 1.18-style cave density field into a 1.12.2 ChunkPrimer.
  */
 public class Mojang118CaveCarver implements ICarver {
+    private static final int CHUNK_SIZE = 16;
+    private static final int WORLD_HEIGHT = 256;
+    private static final int FLUID_FILL_VOLUME = CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE;
+
     private final Mojang118CaveDensitySampler densitySampler;
     private final Mojang118AquiferSampler aquiferSampler;
     private final int bottomY;
@@ -88,6 +94,158 @@ public class Mojang118CaveCarver implements ICarver {
             airBlockState = fluidState == null ? airState : fluidState;
             CarverUtils.digBlockLocal(primer, localX, y, localZ, biome, airBlockState, null, -1, replaceFloatingGravel);
         }
+    }
+
+    public void completeAquiferFluidBodies(ChunkPrimer primer) {
+        if (debugVisualizer) {
+            return;
+        }
+
+        boolean[] visited = new boolean[FLUID_FILL_VOLUME];
+        int[] queue = new int[FLUID_FILL_VOLUME];
+        int[] component = new int[FLUID_FILL_VOLUME];
+
+        completeFluidBodies(primer, Blocks.WATER.getDefaultState(), Material.WATER, visited, queue, component);
+        Arrays.fill(visited, false);
+        completeFluidBodies(primer, Blocks.LAVA.getDefaultState(), Material.LAVA, visited, queue, component);
+    }
+
+    private void completeFluidBodies(ChunkPrimer primer, IBlockState fluidState, Material fluidMaterial,
+                                     boolean[] visited, int[] queue, int[] component) {
+        int minY = Math.max(0, bottomY);
+        int maxY = Math.min(WORLD_HEIGHT - 1, topY);
+
+        for (int localX = 0; localX < CHUNK_SIZE; localX++) {
+            for (int localZ = 0; localZ < CHUNK_SIZE; localZ++) {
+                for (int y = maxY; y >= minY; y--) {
+                    int startIndex = index(localX, y, localZ);
+                    if (visited[startIndex] || primer.getBlockState(localX, y, localZ).getMaterial() != fluidMaterial) {
+                        continue;
+                    }
+
+                    int componentCount = collectFluidComponent(primer, fluidMaterial, visited, queue, component, localX, y, localZ, minY, maxY);
+                    if (componentCount > 0) {
+                        fillConnectedAirBelowSurface(primer, fluidState, fluidMaterial, visited, queue, component, componentCount, minY);
+                    }
+                }
+            }
+        }
+    }
+
+    private int collectFluidComponent(ChunkPrimer primer, Material fluidMaterial, boolean[] visited, int[] queue,
+                                      int[] component, int startX, int startY, int startZ, int minY, int maxY) {
+        int head = 0;
+        int tail = 0;
+        int componentCount = 0;
+
+        queue[tail++] = index(startX, startY, startZ);
+        visited[index(startX, startY, startZ)] = true;
+
+        while (head < tail) {
+            int current = queue[head++];
+            component[componentCount++] = current;
+            int localX = unpackX(current);
+            int y = unpackY(current);
+            int localZ = unpackZ(current);
+
+            tail = enqueueFluidNeighbor(primer, fluidMaterial, visited, queue, tail, localX + 1, y, localZ, minY, maxY);
+            tail = enqueueFluidNeighbor(primer, fluidMaterial, visited, queue, tail, localX - 1, y, localZ, minY, maxY);
+            tail = enqueueFluidNeighbor(primer, fluidMaterial, visited, queue, tail, localX, y + 1, localZ, minY, maxY);
+            tail = enqueueFluidNeighbor(primer, fluidMaterial, visited, queue, tail, localX, y - 1, localZ, minY, maxY);
+            tail = enqueueFluidNeighbor(primer, fluidMaterial, visited, queue, tail, localX, y, localZ + 1, minY, maxY);
+            tail = enqueueFluidNeighbor(primer, fluidMaterial, visited, queue, tail, localX, y, localZ - 1, minY, maxY);
+        }
+
+        return componentCount;
+    }
+
+    private void fillConnectedAirBelowSurface(ChunkPrimer primer, IBlockState fluidState, Material fluidMaterial,
+                                              boolean[] visited, int[] queue, int[] component, int componentCount,
+                                              int minY) {
+        int head = 0;
+        int tail = 0;
+        int surfaceY = minY;
+
+        for (int i = 0; i < componentCount; i++) {
+            int current = component[i];
+            surfaceY = Math.max(surfaceY, unpackY(current));
+            queue[tail++] = current;
+        }
+
+        while (head < tail) {
+            int current = queue[head++];
+            int localX = unpackX(current);
+            int y = unpackY(current);
+            int localZ = unpackZ(current);
+
+            tail = fillAirNeighbor(primer, fluidState, fluidMaterial, visited, queue, tail, localX + 1, y, localZ, minY, surfaceY);
+            tail = fillAirNeighbor(primer, fluidState, fluidMaterial, visited, queue, tail, localX - 1, y, localZ, minY, surfaceY);
+            tail = fillAirNeighbor(primer, fluidState, fluidMaterial, visited, queue, tail, localX, y + 1, localZ, minY, surfaceY);
+            tail = fillAirNeighbor(primer, fluidState, fluidMaterial, visited, queue, tail, localX, y - 1, localZ, minY, surfaceY);
+            tail = fillAirNeighbor(primer, fluidState, fluidMaterial, visited, queue, tail, localX, y, localZ + 1, minY, surfaceY);
+            tail = fillAirNeighbor(primer, fluidState, fluidMaterial, visited, queue, tail, localX, y, localZ - 1, minY, surfaceY);
+        }
+    }
+
+    private int enqueueFluidNeighbor(ChunkPrimer primer, Material fluidMaterial, boolean[] visited, int[] queue,
+                                     int tail, int localX, int y, int localZ, int minY, int maxY) {
+        if (!isInside(localX, y, localZ, minY, maxY)) {
+            return tail;
+        }
+
+        int neighborIndex = index(localX, y, localZ);
+        if (visited[neighborIndex] || primer.getBlockState(localX, y, localZ).getMaterial() != fluidMaterial) {
+            return tail;
+        }
+
+        visited[neighborIndex] = true;
+        queue[tail++] = neighborIndex;
+        return tail;
+    }
+
+    private int fillAirNeighbor(ChunkPrimer primer, IBlockState fluidState, Material fluidMaterial, boolean[] visited,
+                                int[] queue, int tail, int localX, int y, int localZ, int minY, int surfaceY) {
+        if (!isInside(localX, y, localZ, minY, surfaceY)) {
+            return tail;
+        }
+
+        int neighborIndex = index(localX, y, localZ);
+        if (visited[neighborIndex]) {
+            return tail;
+        }
+
+        Material material = primer.getBlockState(localX, y, localZ).getMaterial();
+        if (material == fluidMaterial) {
+            visited[neighborIndex] = true;
+            queue[tail++] = neighborIndex;
+        }
+        else if (material == Material.AIR && !isOppositeFluidAdjacent(primer, localX, y, localZ, fluidState)) {
+            primer.setBlockState(localX, y, localZ, fluidState);
+            visited[neighborIndex] = true;
+            queue[tail++] = neighborIndex;
+        }
+
+        return tail;
+    }
+
+    private boolean isInside(int localX, int y, int localZ, int minY, int maxY) {
+        return localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE && y >= minY && y <= maxY;
+    }
+
+    private int index(int localX, int y, int localZ) {
+        return (localX * WORLD_HEIGHT + y) * CHUNK_SIZE + localZ;
+    }
+
+    private int unpackX(int index) {
+        return index / (WORLD_HEIGHT * CHUNK_SIZE);
+    }
+
+    private int unpackY(int index) {
+        return index / CHUNK_SIZE % WORLD_HEIGHT;
+    }
+
+    private int unpackZ(int index) {
+        return index % CHUNK_SIZE;
     }
 
     private boolean isOppositeFluidAdjacent(ChunkPrimer primer, int localX, int y, int localZ, IBlockState fluidState) {
