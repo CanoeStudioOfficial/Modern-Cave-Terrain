@@ -1,5 +1,6 @@
 package com.yungnickyoung.minecraft.bettercaves.world;
 
+import com.yungnickyoung.minecraft.bettercaves.api.BetterCavesAPI;
 import com.yungnickyoung.minecraft.bettercaves.config.io.ConfigLoader;
 import com.yungnickyoung.minecraft.bettercaves.config.util.ConfigHolder;
 import com.yungnickyoung.minecraft.bettercaves.util.BetterCavesUtils;
@@ -98,6 +99,8 @@ public class MapGenBetterCaves extends MapGenCaves {
         if (cavernHasWork) {
             cavernCarverController.carveChunk(chunkContext);
         }
+
+        BetterCavesAPI.decorateCaves(worldIn, primer, chunkX, chunkZ, config);
     }
 
     /**

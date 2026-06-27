@@ -11,16 +11,10 @@ import net.minecraft.world.World;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.chunk.ChunkPrimer;
 
-import java.util.Arrays;
-
 /**
  * Carves a 1.18-style cave density field into a 1.12.2 ChunkPrimer.
  */
 public class Mojang118CaveCarver implements ICarver {
-    private static final int CHUNK_SIZE = 16;
-    private static final int WORLD_HEIGHT = 256;
-    private static final int FLUID_FILL_VOLUME = CHUNK_SIZE * WORLD_HEIGHT * CHUNK_SIZE;
-
     private final Mojang118CaveDensitySampler densitySampler;
     private final Mojang118AquiferSampler aquiferSampler;
     private final int bottomY;
@@ -61,10 +55,7 @@ public class Mojang118CaveCarver implements ICarver {
             return;
         }
 
-        IBlockState airState = Blocks.AIR.getDefaultState();
-        IBlockState waterState = Blocks.WATER.getDefaultState();
         IBlockState airBlockState;
-        IBlockState fluidState;
         int transitionBoundary = Math.max(bottomY, topY - surfaceCutoff);
         int transitionHeight = Math.max(1, topY - transitionBoundary);
 
@@ -85,192 +76,12 @@ public class Mojang118CaveCarver implements ICarver {
                 continue;
             }
 
-            fluidState = flooded && y < seaLevel
-                    ? waterState
-                    : aquiferSampler.sampleFluidState(blockX, y, blockZ, topY, seaLevel, flooded);
-            if (fluidState != null && isOppositeFluidAdjacent(primer, localX, y, localZ, fluidState)) {
+            airBlockState = aquiferSampler.computeSubstance(blockX, y, blockZ, density, topY, seaLevel, flooded);
+            if (airBlockState == null) {
                 continue;
             }
-            if (fluidState != null && isDryCaveHorizontallyAdjacent(blockX, y, blockZ, topY, flooded)) {
-                continue;
-            }
-            if (fluidState != null && isHorizontalAirAdjacent(primer, localX, y, localZ)) {
-                continue;
-            }
-            airBlockState = fluidState == null ? airState : fluidState;
             CarverUtils.digBlockLocal(primer, localX, y, localZ, biome, airBlockState, null, -1, replaceFloatingGravel);
         }
-    }
-
-    public void completeAquiferFluidBodies(ChunkPrimer primer, int baseBlockX, int baseBlockZ, int[] topYs,
-                                           boolean[] floodedColumns) {
-        if (debugVisualizer) {
-            return;
-        }
-
-        boolean[] fillMask = new boolean[FLUID_FILL_VOLUME];
-        completeSampledFluidGaps(primer, baseBlockX, baseBlockZ, topYs, floodedColumns, Blocks.WATER.getDefaultState(), Material.WATER, fillMask);
-        Arrays.fill(fillMask, false);
-        completeSampledFluidGaps(primer, baseBlockX, baseBlockZ, topYs, floodedColumns, Blocks.LAVA.getDefaultState(), Material.LAVA, fillMask);
-        sealExposedFluidWalls(primer, topYs, floodedColumns, Material.WATER);
-        sealExposedFluidWalls(primer, topYs, floodedColumns, Material.LAVA);
-    }
-
-    private void completeSampledFluidGaps(ChunkPrimer primer, int baseBlockX, int baseBlockZ, int[] topYs,
-                                          boolean[] floodedColumns, IBlockState fluidState, Material fluidMaterial,
-                                          boolean[] fillMask) {
-        int minY = Math.max(0, bottomY);
-
-        for (int localX = 0; localX < CHUNK_SIZE; localX++) {
-            for (int localZ = 0; localZ < CHUNK_SIZE; localZ++) {
-                int columnIndex = columnIndex(localX, localZ);
-                int columnTopY = topYs[columnIndex];
-                if (columnTopY < minY) {
-                    continue;
-                }
-
-                int maxY = Math.min(Math.min(WORLD_HEIGHT - 1, topY), columnTopY);
-                int blockX = baseBlockX + localX;
-                int blockZ = baseBlockZ + localZ;
-
-                for (int y = maxY; y >= minY; y--) {
-                    if (primer.getBlockState(localX, y, localZ).getMaterial() != Material.AIR) {
-                        continue;
-                    }
-
-                    IBlockState sampledState = aquiferSampler.sampleFluidState(blockX, y, blockZ, columnTopY, seaLevel, floodedColumns[columnIndex]);
-                    if (sampledState == null || sampledState.getMaterial() != fluidMaterial) {
-                        continue;
-                    }
-                    if (!isSameFluidAdjacent(primer, localX, y, localZ, fluidMaterial)) {
-                        continue;
-                    }
-                    if (isOppositeFluidAdjacent(primer, localX, y, localZ, fluidState)) {
-                        continue;
-                    }
-                    if (isDryCaveHorizontallyAdjacent(blockX, y, blockZ, columnTopY, floodedColumns[columnIndex])) {
-                        continue;
-                    }
-                    if (isHorizontalAirAdjacent(primer, localX, y, localZ)) {
-                        continue;
-                    }
-
-                    fillMask[index(localX, y, localZ)] = true;
-                }
-            }
-        }
-
-        for (int localX = 0; localX < CHUNK_SIZE; localX++) {
-            for (int localZ = 0; localZ < CHUNK_SIZE; localZ++) {
-                for (int y = minY; y < WORLD_HEIGHT; y++) {
-                    int index = index(localX, y, localZ);
-                    if (fillMask[index]) {
-                        primer.setBlockState(localX, y, localZ, fluidState);
-                    }
-                }
-            }
-        }
-    }
-
-    private void sealExposedFluidWalls(ChunkPrimer primer, int[] topYs, boolean[] floodedColumns, Material fluidMaterial) {
-        boolean[] sealMask = new boolean[FLUID_FILL_VOLUME];
-        int minY = Math.max(0, bottomY);
-
-        for (int localX = 0; localX < CHUNK_SIZE; localX++) {
-            for (int localZ = 0; localZ < CHUNK_SIZE; localZ++) {
-                int columnIndex = columnIndex(localX, localZ);
-                if (floodedColumns[columnIndex] || topYs[columnIndex] < minY) {
-                    continue;
-                }
-
-                int maxY = Math.min(Math.min(WORLD_HEIGHT - 1, topY), topYs[columnIndex]);
-                for (int y = minY; y <= maxY; y++) {
-                    if (primer.getBlockState(localX, y, localZ).getMaterial() != fluidMaterial) {
-                        continue;
-                    }
-
-                    boolean unsupportedBelow = y > 0 && (primer.getBlockState(localX, y - 1, localZ).getMaterial() == Material.AIR
-                            || sealMask[index(localX, y - 1, localZ)]);
-                    if (unsupportedBelow || isHorizontalAirAdjacent(primer, localX, y, localZ)) {
-                        sealMask[index(localX, y, localZ)] = true;
-                    }
-                }
-            }
-        }
-
-        IBlockState stoneState = Blocks.STONE.getDefaultState();
-        for (int localX = 0; localX < CHUNK_SIZE; localX++) {
-            for (int localZ = 0; localZ < CHUNK_SIZE; localZ++) {
-                for (int y = minY; y < WORLD_HEIGHT; y++) {
-                    if (sealMask[index(localX, y, localZ)]) {
-                        primer.setBlockState(localX, y, localZ, stoneState);
-                    }
-                }
-            }
-        }
-    }
-
-    private boolean isSameFluidAdjacent(ChunkPrimer primer, int localX, int y, int localZ, Material fluidMaterial) {
-        return isSameFluid(primer, localX, y + 1, localZ, fluidMaterial)
-                || isSameFluid(primer, localX, y - 1, localZ, fluidMaterial)
-                || isSameFluid(primer, localX + 1, y, localZ, fluidMaterial)
-                || isSameFluid(primer, localX - 1, y, localZ, fluidMaterial)
-                || isSameFluid(primer, localX, y, localZ + 1, fluidMaterial)
-                || isSameFluid(primer, localX, y, localZ - 1, fluidMaterial);
-    }
-
-    private boolean isSameFluid(ChunkPrimer primer, int localX, int y, int localZ, Material fluidMaterial) {
-        if (localX < 0 || localX >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || localZ < 0 || localZ >= CHUNK_SIZE) {
-            return false;
-        }
-
-        return primer.getBlockState(localX, y, localZ).getMaterial() == fluidMaterial;
-    }
-
-    private boolean isHorizontalAirAdjacent(ChunkPrimer primer, int localX, int y, int localZ) {
-        return isAir(primer, localX + 1, y, localZ)
-                || isAir(primer, localX - 1, y, localZ)
-                || isAir(primer, localX, y, localZ + 1)
-                || isAir(primer, localX, y, localZ - 1);
-    }
-
-    private boolean isAir(ChunkPrimer primer, int localX, int y, int localZ) {
-        if (localX < 0 || localX >= CHUNK_SIZE || y < 0 || y >= WORLD_HEIGHT || localZ < 0 || localZ >= CHUNK_SIZE) {
-            return false;
-        }
-
-        return primer.getBlockState(localX, y, localZ).getMaterial() == Material.AIR;
-    }
-
-    private int columnIndex(int localX, int localZ) {
-        return localX * CHUNK_SIZE + localZ;
-    }
-
-    private int index(int localX, int y, int localZ) {
-        return (localX * WORLD_HEIGHT + y) * CHUNK_SIZE + localZ;
-    }
-
-    private boolean isDryCaveHorizontallyAdjacent(int blockX, int y, int blockZ, int topY, boolean flooded) {
-        return isDryCave(blockX + 1, y, blockZ, topY, flooded)
-                || isDryCave(blockX - 1, y, blockZ, topY, flooded)
-                || isDryCave(blockX, y, blockZ + 1, topY, flooded)
-                || isDryCave(blockX, y, blockZ - 1, topY, flooded);
-    }
-
-    private boolean isDryCave(int blockX, int y, int blockZ, int topY, boolean flooded) {
-        double density = densitySampler.sampleDensity(blockX, y, blockZ);
-        int transitionBoundary = Math.max(bottomY, topY - surfaceCutoff);
-        if (y >= transitionBoundary) {
-            int transitionHeight = Math.max(1, topY - transitionBoundary);
-            double surfaceFactor = (double) (y - transitionBoundary) / transitionHeight;
-            density += surfaceFactor * 0.45D;
-        }
-
-        if (density > densityThreshold) {
-            return false;
-        }
-
-        return !(flooded && y < seaLevel) && aquiferSampler.sampleFluidState(blockX, y, blockZ, topY, seaLevel, flooded) == null;
     }
 
     private boolean isOppositeFluidAdjacent(ChunkPrimer primer, int localX, int y, int localZ, IBlockState fluidState) {
