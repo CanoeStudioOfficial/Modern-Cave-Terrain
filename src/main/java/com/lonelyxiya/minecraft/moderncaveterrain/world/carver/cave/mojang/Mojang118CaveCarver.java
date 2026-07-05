@@ -56,15 +56,12 @@ public class Mojang118CaveCarver implements ICarver {
         }
 
         IBlockState airBlockState;
-        int transitionBoundary = Math.max(bottomY, topY - surfaceCutoff);
-        int transitionHeight = Math.max(1, topY - transitionBoundary);
+        boolean allowSurfaceEntrance = !flooded;
 
         for (int y = topY; y >= bottomY; y--) {
             double density = densitySampler.sampleDensity(blockX, y, blockZ);
-            if (y >= transitionBoundary) {
-                double surfaceFactor = (double) (y - transitionBoundary) / transitionHeight;
-                density += surfaceFactor * 0.45D;
-            }
+            density = densitySampler.applySurfaceAdjustment(density, blockX, y, blockZ, topY, bottomY,
+                    surfaceCutoff, allowSurfaceEntrance);
 
             boolean digBlock = density <= densityThreshold;
             if (debugVisualizer) {

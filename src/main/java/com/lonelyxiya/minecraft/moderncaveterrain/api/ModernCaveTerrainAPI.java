@@ -264,11 +264,8 @@ public final class ModernCaveTerrainAPI {
                 config.getMojang118StyleCaveHorizontalScale(),
                 config.getMojang118StyleCaveVerticalScale());
         double density = densitySampler.sampleDensity(blockX, blockY, blockZ);
-        int transitionBoundary = Math.max(bottomY, surfaceY - config.getMojang118StyleCaveSurfaceCutoffDepth());
-        if (blockY >= transitionBoundary) {
-            int transitionHeight = Math.max(1, surfaceY - transitionBoundary);
-            density += ((double) (blockY - transitionBoundary) / transitionHeight) * 0.45D;
-        }
+        density = densitySampler.applySurfaceAdjustment(density, blockX, blockY, blockZ, surfaceY, bottomY,
+                config.getMojang118StyleCaveSurfaceCutoffDepth(), surfaceY > world.getSeaLevel());
 
         double threshold = config.getMojang118StyleCaveDensityThreshold();
         boolean open = density <= threshold;

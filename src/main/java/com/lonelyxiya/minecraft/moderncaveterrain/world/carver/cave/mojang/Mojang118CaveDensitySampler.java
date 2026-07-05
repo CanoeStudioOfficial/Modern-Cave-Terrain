@@ -76,6 +76,40 @@ public class Mojang118CaveDensitySampler {
         return fullNoise;
     }
 
+    public double applySurfaceAdjustment(double density, int blockX, int blockY, int blockZ, int surfaceY,
+                                         int bottomY, int surfaceCutoff, boolean allowSurfaceEntrance) {
+        int transitionBoundary = Math.max(bottomY, surfaceY - surfaceCutoff);
+        int transitionHeight = Math.max(1, surfaceY - transitionBoundary);
+        double entranceStrength = allowSurfaceEntrance ? surfaceEntranceStrength(blockX, blockY, blockZ, surfaceY) : 0.0D;
+
+        if (blockY >= transitionBoundary) {
+            double surfaceFactor = (double) (blockY - transitionBoundary) / transitionHeight;
+            density += surfaceFactor * 0.45D * (1.0D - entranceStrength * 0.92D);
+        }
+
+        if (entranceStrength <= 0.0D || blockY > surfaceY) {
+            return density;
+        }
+
+        int depthBelowSurface = surfaceY - blockY;
+        double mouthFade = clampedMap(depthBelowSurface, 0.0D, 18.0D, 1.0D, 0.0D);
+        double throatFade = clampedMap(depthBelowSurface, 4.0D, 36.0D, 0.65D, 0.0D);
+        double aperture = clampedMap(entranceStrength, 0.42D, 1.0D, 0.0D, 1.0D);
+
+        return density - aperture * (mouthFade * 0.38D + throatFade * 0.18D);
+    }
+
+    private double surfaceEntranceStrength(int blockX, int blockY, int blockZ, int surfaceY) {
+        double currentEntrance = entrances(blockX, toMojangY(blockY), blockZ);
+        double surfaceEntrance = entrances(blockX, toMojangY(Math.max(0, surfaceY - 2)), blockZ);
+        double entranceDensity = Math.min(currentEntrance, surfaceEntrance);
+        double densityStrength = clampedMap(entranceDensity, 0.20D, -0.16D, 0.0D, 1.0D);
+        int depthBelowSurface = Math.max(0, surfaceY - blockY);
+        double verticalStrength = clampedMap(depthBelowSurface, 36.0D, 0.0D, 0.0D, 1.0D);
+
+        return densityStrength * verticalStrength;
+    }
+
     private double slopedCheese(int blockX, double mojangY, int blockZ) {
         double heightGradient = yClampedGradient(mojangY, -64, 320, 1.5D, -1.5D);
         double baseNoise = sample(caveCheese, blockX, mojangY, blockZ, 1.0D, 0.6666666666666666D);
@@ -255,6 +289,27 @@ public class Mojang118CaveDensitySampler {
 
     private static double clamp(double value, double min, double max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private static double clampedMap(double value, double fromMin, double fromMax, double toMin, double toMax) {
+        if (fromMin < fromMax) {
+            if (value <= fromMin) {
+                return toMin;
+            }
+            if (value >= fromMax) {
+                return toMax;
+            }
+        }
+        else {
+            if (value >= fromMin) {
+                return toMin;
+            }
+            if (value <= fromMax) {
+                return toMax;
+            }
+        }
+
+        return lerp((value - fromMin) / (fromMax - fromMin), toMin, toMax);
     }
 
 }
