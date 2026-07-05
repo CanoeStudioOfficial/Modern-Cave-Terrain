@@ -16,10 +16,8 @@ import net.minecraft.block.state.IBlockState;
 import net.minecraft.init.Blocks;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
-import net.minecraft.world.biome.Biome;
 import net.minecraft.world.chunk.ChunkPrimer;
 import net.minecraft.world.gen.MapGenBase;
-import net.minecraftforge.common.BiomeDictionary;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.terraingen.InitMapGenEvent;
 import net.minecraftforge.fml.common.Loader;
@@ -39,6 +37,8 @@ public final class ModernCaveTerrainAPI {
     public static final String NAME = ModernCaveTerrainSettings.NAME;
     public static final String VERSION = ModernCaveTerrainSettings.VERSION;
     private static final List<ModernCaveTerrainCaveDecorator> CAVE_DECORATORS = new CopyOnWriteArrayList<>();
+    private static final List<ModernCaveTerrainUndergroundBiomeResolver> UNDERGROUND_BIOME_RESOLVERS =
+            new CopyOnWriteArrayList<>();
 
     private ModernCaveTerrainAPI() {}
 
@@ -214,6 +214,31 @@ public final class ModernCaveTerrainAPI {
     }
 
     /**
+     * Registers an underground biome resolver.
+     *
+     * <p>Resolvers run after the built-in pseudo-3D multi-noise sample and may replace it. This lets decoration
+     * mods add or redirect underground biome bands without replacing Modern Cave Terrain internals.</p>
+     *
+     * @param resolver resolver instance
+     */
+    public static void registerUndergroundBiomeResolver(ModernCaveTerrainUndergroundBiomeResolver resolver) {
+        if (resolver == null) {
+            throw new IllegalArgumentException("Modern Cave Terrain underground biome resolver cannot be null");
+        }
+        UNDERGROUND_BIOME_RESOLVERS.add(resolver);
+    }
+
+    /**
+     * Unregisters an underground biome resolver.
+     *
+     * @param resolver resolver instance
+     * @return true when the resolver was registered and removed
+     */
+    public static boolean unregisterUndergroundBiomeResolver(ModernCaveTerrainUndergroundBiomeResolver resolver) {
+        return UNDERGROUND_BIOME_RESOLVERS.remove(resolver);
+    }
+
+    /**
      * Called by Modern Cave Terrain internals after carving.
      */
     public static void decorateCaves(World world, ChunkPrimer primer, int chunkX, int chunkZ, ConfigHolder config) {
@@ -275,79 +300,55 @@ public final class ModernCaveTerrainAPI {
 
         return new ModernCaveTerrainCaveSample(blockX, blockY, blockZ, density, threshold, open,
                 open ? ModernCaveTerrainCaveType.MOJANG_118 : ModernCaveTerrainCaveType.NONE,
-                classifyCaveBiome(world, blockX, blockY, blockZ, fluidState), fluidState);
+                sampleUndergroundBiome(world, config, blockX, blockY, blockZ, fluidState).getCaveBiomeType(),
+                fluidState);
     }
 
-    private static ModernCaveTerrainCaveBiomeType classifyCaveBiome(World world, int blockX, int blockY, int blockZ,
-                                                              IBlockState fluidState) {
-        if (fluidState != null && fluidState.getBlock() == Blocks.LAVA) {
-            return ModernCaveTerrainCaveBiomeType.LAVA;
+    /**
+     * Samples the pseudo-3D underground biome field at a block position.
+     */
+    public static ModernCaveTerrainUndergroundBiomeSample sampleUndergroundBiome(World world, int blockX, int blockY,
+                                                                                 int blockZ) {
+        return sampleUndergroundBiome(world, getConfigForDimension(world.provider.getDimension()), blockX, blockY,
+                blockZ, null);
+    }
+
+    /**
+     * Samples the pseudo-3D underground biome field at a block position with a known fluid state.
+     */
+    public static ModernCaveTerrainUndergroundBiomeSample sampleUndergroundBiome(World world, int blockX, int blockY,
+                                                                                 int blockZ,
+                                                                                 IBlockState fluidState) {
+        return sampleUndergroundBiome(world, getConfigForDimension(world.provider.getDimension()), blockX, blockY,
+                blockZ, fluidState);
+    }
+
+    /**
+     * Samples the pseudo-3D underground biome field at a block position with a supplied config.
+     */
+    public static ModernCaveTerrainUndergroundBiomeSample sampleUndergroundBiome(World world,
+                                                                                 ModernCaveTerrainConfig config,
+                                                                                 int blockX, int blockY,
+                                                                                 int blockZ) {
+        return sampleUndergroundBiome(world, config, blockX, blockY, blockZ, null);
+    }
+
+    /**
+     * Samples the pseudo-3D underground biome field at a block position with a supplied config and fluid state.
+     */
+    public static ModernCaveTerrainUndergroundBiomeSample sampleUndergroundBiome(World world,
+                                                                                 ModernCaveTerrainConfig config,
+                                                                                 int blockX, int blockY,
+                                                                                 int blockZ,
+                                                                                 IBlockState fluidState) {
+        ModernCaveTerrainUndergroundBiomeSample sample =
+                ModernCaveTerrainUndergroundBiomeSampler.sample(world, config, blockX, blockY, blockZ, fluidState);
+        for (ModernCaveTerrainUndergroundBiomeResolver resolver : UNDERGROUND_BIOME_RESOLVERS) {
+            ModernCaveTerrainUndergroundBiomeSample replacement = resolver.resolve(world, sample);
+            if (replacement != null) {
+                sample = replacement;
+            }
         }
-        if (fluidState != null && fluidState.getBlock() == Blocks.WATER) {
-            return ModernCaveTerrainCaveBiomeType.UNDERWATER;
-        }
-
-        double region = smoothNoise(world.getSeed() ^ 0x424341564542494FL, blockX * 0.012D, 0.0D, blockZ * 0.012D);
-        double detail = smoothNoise(world.getSeed() ^ 0x4452495053544F4EL, blockX * 0.018D, blockY * 0.03D, blockZ * 0.018D);
-        Biome biome = world.getBiome(new BlockPos(blockX, 0, blockZ));
-        boolean wetSurface = biome.getRainfall() >= 0.8F
-                || BiomeDictionary.hasType(biome, BiomeDictionary.Type.WET)
-                || BiomeDictionary.hasType(biome, BiomeDictionary.Type.JUNGLE)
-                || BiomeDictionary.hasType(biome, BiomeDictionary.Type.SWAMP);
-
-        if (wetSurface && blockY >= 8 && blockY <= 70 && region + detail * 0.25D > 0.12D) {
-            return ModernCaveTerrainCaveBiomeType.LUSH;
-        }
-        if (blockY >= 4 && blockY <= 72 && region * 0.35D - detail > 0.18D) {
-            return ModernCaveTerrainCaveBiomeType.DRIPSTONE;
-        }
-        if (blockY <= 18 && region < -0.45D) {
-            return ModernCaveTerrainCaveBiomeType.DEEP_DARK;
-        }
-
-        return ModernCaveTerrainCaveBiomeType.NORMAL;
-    }
-
-    private static double smoothNoise(long seed, double x, double y, double z) {
-        int x0 = floor(x);
-        int y0 = floor(y);
-        int z0 = floor(z);
-        int x1 = x0 + 1;
-        int y1 = y0 + 1;
-        int z1 = z0 + 1;
-        double tx = smoothstep(x - x0);
-        double ty = smoothstep(y - y0);
-        double tz = smoothstep(z - z0);
-        double x00 = lerp(tx, valueNoise(seed, x0, y0, z0), valueNoise(seed, x1, y0, z0));
-        double x10 = lerp(tx, valueNoise(seed, x0, y1, z0), valueNoise(seed, x1, y1, z0));
-        double x01 = lerp(tx, valueNoise(seed, x0, y0, z1), valueNoise(seed, x1, y0, z1));
-        double x11 = lerp(tx, valueNoise(seed, x0, y1, z1), valueNoise(seed, x1, y1, z1));
-        return lerp(tz, lerp(ty, x00, x10), lerp(ty, x01, x11));
-    }
-
-    private static double valueNoise(long seed, int x, int y, int z) {
-        long hash = seed;
-        hash ^= x * 341873128712L;
-        hash ^= y * 132897987541L;
-        hash ^= z * 42317861L;
-        hash ^= hash >> 33;
-        hash *= 0xff51afd7ed558ccdL;
-        hash ^= hash >> 33;
-        hash *= 0xc4ceb9fe1a85ec53L;
-        hash ^= hash >> 33;
-        return ((hash >>> 11) * 0x1.0p-53D) * 2.0D - 1.0D;
-    }
-
-    private static int floor(double value) {
-        int integer = (int) value;
-        return value < integer ? integer - 1 : integer;
-    }
-
-    private static double smoothstep(double value) {
-        return value * value * (3.0D - 2.0D * value);
-    }
-
-    private static double lerp(double factor, double from, double to) {
-        return from + factor * (to - from);
+        return sample;
     }
 }

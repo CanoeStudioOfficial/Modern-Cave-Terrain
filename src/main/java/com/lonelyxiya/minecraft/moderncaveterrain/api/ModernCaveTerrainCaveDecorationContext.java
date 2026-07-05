@@ -66,4 +66,17 @@ public final class ModernCaveTerrainCaveDecorationContext {
     public ModernCaveTerrainCaveSample sample(int blockX, int blockY, int blockZ) {
         return ModernCaveTerrainAPI.sampleCave(world, config, blockX, blockY, blockZ);
     }
+
+    public ModernCaveTerrainUndergroundBiomeSample sampleUndergroundBiomeLocal(int localX, int y, int localZ) {
+        return sampleUndergroundBiome(getBlockX(localX), y, getBlockZ(localZ), getBlockState(localX, y, localZ));
+    }
+
+    public ModernCaveTerrainUndergroundBiomeSample sampleUndergroundBiome(int blockX, int blockY, int blockZ) {
+        return ModernCaveTerrainAPI.sampleUndergroundBiome(world, config, blockX, blockY, blockZ);
+    }
+
+    public ModernCaveTerrainUndergroundBiomeSample sampleUndergroundBiome(int blockX, int blockY, int blockZ,
+                                                                          IBlockState fluidState) {
+        return ModernCaveTerrainAPI.sampleUndergroundBiome(world, config, blockX, blockY, blockZ, fluidState);
+    }
 }
