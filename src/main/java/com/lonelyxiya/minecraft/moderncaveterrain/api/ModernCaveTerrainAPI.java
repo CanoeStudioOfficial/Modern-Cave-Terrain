@@ -191,8 +191,8 @@ public final class ModernCaveTerrainAPI {
      * Registers a chunk-level cave decorator.
      *
      * <p>Decorators are invoked after Modern Cave Terrain finishes carving a chunk, while the chunk is still represented
-     * by a {@link ChunkPrimer}. This is intended for cave-biome decoration systems such as lush caves and
-     * dripstone caves.</p>
+     * by a {@link ChunkPrimer}. This is intended for cave-biome decoration systems driven by the generic
+     * pseudo-3D underground biome API.</p>
      *
      * @param decorator decorator instance
      */

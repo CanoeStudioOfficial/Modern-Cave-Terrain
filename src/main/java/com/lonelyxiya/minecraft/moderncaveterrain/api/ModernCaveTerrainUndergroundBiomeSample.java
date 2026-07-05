@@ -14,9 +14,7 @@ import net.minecraft.world.biome.Biome;
 public final class ModernCaveTerrainUndergroundBiomeSample {
     public static final ResourceLocation NONE = new ResourceLocation(ModernCaveTerrainSettings.MOD_ID, "none");
     public static final ResourceLocation NORMAL_CAVES = new ResourceLocation(ModernCaveTerrainSettings.MOD_ID, "normal_caves");
-    public static final ResourceLocation LUSH_CAVES = new ResourceLocation("minecraft", "lush_caves");
-    public static final ResourceLocation DRIPSTONE_CAVES = new ResourceLocation("minecraft", "dripstone_caves");
-    public static final ResourceLocation DEEP_DARK = new ResourceLocation("minecraft", "deep_dark");
+    public static final ResourceLocation GENERIC_3D_CAVES = new ResourceLocation(ModernCaveTerrainSettings.MOD_ID, "generic_3d_caves");
     public static final ResourceLocation UNDERWATER_CAVES = new ResourceLocation(ModernCaveTerrainSettings.MOD_ID, "underwater_caves");
     public static final ResourceLocation LAVA_CAVES = new ResourceLocation(ModernCaveTerrainSettings.MOD_ID, "lava_caves");
 
@@ -163,12 +161,8 @@ public final class ModernCaveTerrainUndergroundBiomeSample {
         switch (caveBiomeType) {
             case NORMAL:
                 return NORMAL_CAVES;
-            case LUSH:
-                return LUSH_CAVES;
-            case DRIPSTONE:
-                return DRIPSTONE_CAVES;
-            case DEEP_DARK:
-                return DEEP_DARK;
+            case GENERIC_3D:
+                return GENERIC_3D_CAVES;
             case UNDERWATER:
                 return UNDERWATER_CAVES;
             case LAVA:

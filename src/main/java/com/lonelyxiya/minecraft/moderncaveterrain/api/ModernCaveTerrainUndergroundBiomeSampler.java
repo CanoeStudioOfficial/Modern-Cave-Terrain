@@ -20,24 +20,6 @@ import java.util.concurrent.ConcurrentMap;
  * selection, while avoiding high-version biome registries and 3D biome containers.</p>
  */
 public final class ModernCaveTerrainUndergroundBiomeSampler {
-    private static final double MAX_UNDERGROUND_DISTANCE = 0.0325D;
-    private static final ParameterRange FULL_RANGE = new ParameterRange(-1.0D, 1.0D);
-    private static final ParameterRange UNDERGROUND_DEPTH = new ParameterRange(0.2D, 0.9D);
-    private static final ClimateCandidate[] CANDIDATES = new ClimateCandidate[] {
-            new ClimateCandidate(ModernCaveTerrainCaveBiomeType.DRIPSTONE,
-                    ModernCaveTerrainUndergroundBiomeSample.DRIPSTONE_CAVES,
-                    FULL_RANGE, FULL_RANGE, new ParameterRange(0.8D, 1.0D), FULL_RANGE,
-                    UNDERGROUND_DEPTH, FULL_RANGE),
-            new ClimateCandidate(ModernCaveTerrainCaveBiomeType.LUSH,
-                    ModernCaveTerrainUndergroundBiomeSample.LUSH_CAVES,
-                    FULL_RANGE, new ParameterRange(0.7D, 1.0D), FULL_RANGE, FULL_RANGE,
-                    UNDERGROUND_DEPTH, FULL_RANGE),
-            new ClimateCandidate(ModernCaveTerrainCaveBiomeType.DEEP_DARK,
-                    ModernCaveTerrainUndergroundBiomeSample.DEEP_DARK,
-                    FULL_RANGE, FULL_RANGE, FULL_RANGE, new ParameterRange(-1.0D, -0.375D),
-                    new ParameterRange(0.9D, 1.2D), FULL_RANGE)
-    };
-
     private static final ConcurrentMap<Long, NoiseSet> NOISE_CACHE = new ConcurrentHashMap<>();
 
     private ModernCaveTerrainUndergroundBiomeSampler() {}
@@ -59,9 +41,11 @@ public final class ModernCaveTerrainUndergroundBiomeSampler {
                     Double.POSITIVE_INFINITY, 1.0D, surfaceBiome, fluidState);
         }
 
-        CandidateChoice choice = chooseCandidate(target);
-        return createSample(blockX, blockY, blockZ, choice.type, choice.biomeId, target, choice.distance,
-                choice.secondDistance, choice.edgeFactor, surfaceBiome, fluidState);
+        ResourceLocation biomeId = createGenericBiomeId(target);
+        double distance = genericCenterDistance(target);
+        double edgeFactor = genericEdgeFactor(target);
+        return createSample(blockX, blockY, blockZ, ModernCaveTerrainCaveBiomeType.GENERIC_3D, biomeId, target,
+                distance, Double.POSITIVE_INFINITY, edgeFactor, surfaceBiome, fluidState);
     }
 
     private static ClimatePoint sampleClimate(World world, ModernCaveTerrainConfig config, Biome surfaceBiome,
@@ -92,35 +76,118 @@ public final class ModernCaveTerrainUndergroundBiomeSampler {
                 clamp(depth, -0.1D, 1.2D), clamp(weirdness, -1.0D, 1.0D));
     }
 
-    private static CandidateChoice chooseCandidate(ClimatePoint target) {
-        ClimateCandidate best = null;
-        double bestDistance = Double.POSITIVE_INFINITY;
-        double secondDistance = Double.POSITIVE_INFINITY;
+    private static ResourceLocation createGenericBiomeId(ClimatePoint target) {
+        String path = "underground/"
+                + depthBand(target.depth) + "_"
+                + temperatureBand(target.temperature) + "_"
+                + humidityBand(target.humidity) + "_"
+                + continentalnessBand(target.continentalness) + "_"
+                + erosionBand(target.erosion) + "_"
+                + weirdnessBand(target.weirdness);
+        return new ResourceLocation("moderncaveterrain", path);
+    }
 
-        for (ClimateCandidate candidate : CANDIDATES) {
-            double distance = candidate.fitness(target);
-            if (distance < bestDistance) {
-                secondDistance = bestDistance;
-                bestDistance = distance;
-                best = candidate;
-            }
-            else if (distance < secondDistance) {
-                secondDistance = distance;
-            }
+    private static double genericCenterDistance(ClimatePoint target) {
+        return square(target.temperature - centerForClimateBand(target.temperature))
+                + square(target.humidity - centerForClimateBand(target.humidity))
+                + square(target.continentalness - centerForClimateBand(target.continentalness))
+                + square(target.erosion - centerForClimateBand(target.erosion))
+                + square(target.depth - centerForDepthBand(target.depth)) * 1.35D
+                + square(target.weirdness - centerForClimateBand(target.weirdness)) * 0.8D;
+    }
+
+    private static double genericEdgeFactor(ClimatePoint target) {
+        double distance = Math.min(distanceToThreshold(target.temperature, -0.25D, 0.35D),
+                distanceToThreshold(target.humidity, -0.25D, 0.35D));
+        distance = Math.min(distance, distanceToThreshold(target.continentalness, -0.25D, 0.35D));
+        distance = Math.min(distance, distanceToThreshold(target.erosion, -0.25D, 0.35D));
+        distance = Math.min(distance, distanceToThreshold(target.weirdness, -0.25D, 0.35D));
+        distance = Math.min(distance, distanceToThreshold(target.depth, 0.33D, 0.72D));
+        return clamp(distance / 0.18D, 0.0D, 1.0D);
+    }
+
+    private static double distanceToThreshold(double value, double lowerThreshold, double upperThreshold) {
+        return Math.min(Math.abs(value - lowerThreshold), Math.abs(value - upperThreshold));
+    }
+
+    private static double centerForClimateBand(double value) {
+        if (value < -0.25D) {
+            return -0.625D;
         }
-
-        if (best == null || bestDistance > MAX_UNDERGROUND_DISTANCE) {
-            double edgeFactor = clamp((bestDistance - MAX_UNDERGROUND_DISTANCE) / MAX_UNDERGROUND_DISTANCE, 0.0D, 1.0D);
-            return new CandidateChoice(ModernCaveTerrainCaveBiomeType.NORMAL,
-                    ModernCaveTerrainUndergroundBiomeSample.NORMAL_CAVES, bestDistance, secondDistance, edgeFactor);
+        if (value < 0.35D) {
+            return 0.05D;
         }
+        return 0.675D;
+    }
 
-        double thresholdFactor = clamp((MAX_UNDERGROUND_DISTANCE - bestDistance) / MAX_UNDERGROUND_DISTANCE, 0.0D, 1.0D);
-        double neighborFactor = secondDistance == Double.POSITIVE_INFINITY
-                ? 1.0D
-                : clamp((secondDistance - bestDistance) / 0.08D, 0.0D, 1.0D);
-        return new CandidateChoice(best.type, best.biomeId, bestDistance, secondDistance,
-                Math.min(thresholdFactor, neighborFactor));
+    private static double centerForDepthBand(double value) {
+        if (value < 0.33D) {
+            return 0.165D;
+        }
+        if (value < 0.72D) {
+            return 0.525D;
+        }
+        return 0.96D;
+    }
+
+    private static String depthBand(double value) {
+        if (value < 0.33D) {
+            return "upper";
+        }
+        if (value < 0.72D) {
+            return "middle";
+        }
+        return "deep";
+    }
+
+    private static String temperatureBand(double value) {
+        if (value < -0.25D) {
+            return "cold";
+        }
+        if (value < 0.35D) {
+            return "temperate";
+        }
+        return "warm";
+    }
+
+    private static String humidityBand(double value) {
+        if (value < -0.25D) {
+            return "dry";
+        }
+        if (value < 0.35D) {
+            return "neutral";
+        }
+        return "humid";
+    }
+
+    private static String continentalnessBand(double value) {
+        if (value < -0.25D) {
+            return "low_continentalness";
+        }
+        if (value < 0.35D) {
+            return "mid_continentalness";
+        }
+        return "high_continentalness";
+    }
+
+    private static String erosionBand(double value) {
+        if (value < -0.25D) {
+            return "low_erosion";
+        }
+        if (value < 0.35D) {
+            return "mid_erosion";
+        }
+        return "high_erosion";
+    }
+
+    private static String weirdnessBand(double value) {
+        if (value < -0.25D) {
+            return "low_weirdness";
+        }
+        if (value < 0.35D) {
+            return "mid_weirdness";
+        }
+        return "high_weirdness";
     }
 
     private static ModernCaveTerrainUndergroundBiomeSample createSample(int blockX, int blockY, int blockZ,
@@ -239,6 +306,10 @@ public final class ModernCaveTerrainUndergroundBiomeSampler {
         return Math.max(min, Math.min(max, value));
     }
 
+    private static double square(double value) {
+        return value * value;
+    }
+
     private enum FluidKind {
         NONE,
         WATER,
@@ -282,78 +353,4 @@ public final class ModernCaveTerrainUndergroundBiomeSampler {
         }
     }
 
-    private static final class ParameterRange {
-        private final double min;
-        private final double max;
-
-        private ParameterRange(double min, double max) {
-            this.min = min;
-            this.max = max;
-        }
-
-        private double distance(double value) {
-            if (value < min) {
-                return min - value;
-            }
-            if (value > max) {
-                return value - max;
-            }
-            return 0.0D;
-        }
-    }
-
-    private static final class ClimateCandidate {
-        private final ModernCaveTerrainCaveBiomeType type;
-        private final ResourceLocation biomeId;
-        private final ParameterRange temperature;
-        private final ParameterRange humidity;
-        private final ParameterRange continentalness;
-        private final ParameterRange erosion;
-        private final ParameterRange depth;
-        private final ParameterRange weirdness;
-
-        private ClimateCandidate(ModernCaveTerrainCaveBiomeType type, ResourceLocation biomeId,
-                                 ParameterRange temperature, ParameterRange humidity,
-                                 ParameterRange continentalness, ParameterRange erosion,
-                                 ParameterRange depth, ParameterRange weirdness) {
-            this.type = type;
-            this.biomeId = biomeId;
-            this.temperature = temperature;
-            this.humidity = humidity;
-            this.continentalness = continentalness;
-            this.erosion = erosion;
-            this.depth = depth;
-            this.weirdness = weirdness;
-        }
-
-        private double fitness(ClimatePoint target) {
-            return square(temperature.distance(target.temperature)) * 0.75D
-                    + square(humidity.distance(target.humidity)) * 1.15D
-                    + square(continentalness.distance(target.continentalness)) * 1.15D
-                    + square(erosion.distance(target.erosion)) * 1.05D
-                    + square(depth.distance(target.depth)) * 2.25D
-                    + square(weirdness.distance(target.weirdness)) * 0.75D;
-        }
-
-        private static double square(double value) {
-            return value * value;
-        }
-    }
-
-    private static final class CandidateChoice {
-        private final ModernCaveTerrainCaveBiomeType type;
-        private final ResourceLocation biomeId;
-        private final double distance;
-        private final double secondDistance;
-        private final double edgeFactor;
-
-        private CandidateChoice(ModernCaveTerrainCaveBiomeType type, ResourceLocation biomeId, double distance,
-                                double secondDistance, double edgeFactor) {
-            this.type = type;
-            this.biomeId = biomeId;
-            this.distance = distance;
-            this.secondDistance = secondDistance;
-            this.edgeFactor = edgeFactor;
-        }
-    }
 }

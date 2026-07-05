@@ -6,9 +6,7 @@ package com.lonelyxiya.minecraft.moderncaveterrain.api;
 public enum ModernCaveTerrainCaveBiomeType {
     NONE,
     NORMAL,
-    LUSH,
-    DRIPSTONE,
-    DEEP_DARK,
+    GENERIC_3D,
     UNDERWATER,
     LAVA
 }
