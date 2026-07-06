@@ -41,7 +41,7 @@ public class CaveCarverController {
         this.world = worldIn;
         this.isDebugViewEnabled = config.debugVisualizer.get();
         this.isOverrideSurfaceDetectionEnabled = config.overrideSurfaceDetection.get();
-        this.isSurfaceCavesEnabled = config.isSurfaceCavesEnabled.get();
+        this.isSurfaceCavesEnabled = config.isSurfaceCavesEnabled.get() && config.mojang118CavePriority.get() == 0;
         this.isFloodedUndergroundEnabled = config.enableFloodedUnderground.get();
         this.surfaceCaveCarver = new VanillaCaveCarverBuilder()
             .bottomY(config.surfaceCaveBottom.get())

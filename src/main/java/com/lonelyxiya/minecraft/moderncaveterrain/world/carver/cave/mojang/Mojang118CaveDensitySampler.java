@@ -13,6 +13,7 @@ public class Mojang118CaveDensitySampler {
     private static final double MOJANG_MIN_Y = -64.0D;
     private static final double MOJANG_HEIGHT = 384.0D;
     private static final double OLD_WORLD_MAX_Y = 255.0D;
+    private static final int SURFACE_ENTRANCE_MAX_DEPTH = 44;
 
     private final MojangNormalNoise caveCheese;
     private final MojangNormalNoise caveLayer;
@@ -96,28 +97,57 @@ public class Mojang118CaveDensitySampler {
 
         int depthBelowSurface = surfaceY - blockY;
         double mouthFade = clampedMap(depthBelowSurface, 0.0D, 12.0D, 1.0D, 0.0D);
-        double throatFade = clampedMap(depthBelowSurface, 4.0D, 34.0D, 0.45D, 0.0D);
+        double throatFade = clampedMap(depthBelowSurface, 4.0D, 36.0D, 0.55D, 0.0D);
 
-        return density - entranceAperture * (mouthFade * 0.16D + throatFade * 0.08D);
+        return density - entranceAperture * (mouthFade * 0.28D + throatFade * 0.16D);
     }
 
     public boolean isSurfaceEntrance(int blockX, int blockY, int blockZ, int surfaceY, double densityThreshold) {
-        if (blockY > surfaceY || surfaceY - blockY > 28) {
+        if (blockY > surfaceY || surfaceY - blockY > SURFACE_ENTRANCE_MAX_DEPTH) {
             return false;
         }
 
-        return modernEntranceStrength(blockX, blockY, blockZ, surfaceY, densityThreshold) > 0.58D;
+        return surfaceEntranceStrength(blockX, blockY, blockZ, surfaceY, densityThreshold) > 0.54D;
+    }
+
+    public boolean shouldCarveSurfaceEntrance(double rawDensity, double adjustedDensity, int blockX, int blockY,
+                                              int blockZ, int surfaceY, double densityThreshold) {
+        if (blockY > surfaceY || surfaceY - blockY > SURFACE_ENTRANCE_MAX_DEPTH) {
+            return false;
+        }
+
+        int depthBelowSurface = surfaceY - blockY;
+        double entranceStrength = surfaceEntranceStrength(blockX, blockY, blockZ, surfaceY, densityThreshold);
+        double graphAlreadyOpen = graphOpenStrength(rawDensity, densityThreshold);
+        double depthFactor = clampedMap(depthBelowSurface, 0.0D, SURFACE_ENTRANCE_MAX_DEPTH, 1.0D, 0.18D);
+        double openStrength = Math.max(entranceStrength, graphAlreadyOpen * depthFactor);
+        double loosenedThreshold = densityThreshold + openStrength * clampedMap(depthBelowSurface, 0.0D,
+                SURFACE_ENTRANCE_MAX_DEPTH, 0.30D, 0.08D);
+
+        return openStrength > 0.48D && adjustedDensity <= loosenedThreshold;
+    }
+
+    public double surfaceEntranceStrength(int blockX, int blockY, int blockZ, int surfaceY,
+                                          double densityThreshold) {
+        if (blockY > surfaceY || surfaceY - blockY > SURFACE_ENTRANCE_MAX_DEPTH) {
+            return 0.0D;
+        }
+
+        int depthBelowSurface = Math.max(0, surfaceY - blockY);
+        double modernEntranceStrength = modernEntranceStrength(blockX, blockY, blockZ, surfaceY, densityThreshold);
+        double verticalStrength = clampedMap(depthBelowSurface, 0.0D, SURFACE_ENTRANCE_MAX_DEPTH, 1.0D, 0.0D);
+
+        return modernEntranceStrength * verticalStrength;
     }
 
     private double surfaceEntranceAperture(double density, int blockX, int blockY, int blockZ, int surfaceY,
                                            double densityThreshold) {
         int depthBelowSurface = Math.max(0, surfaceY - blockY);
-        double modernEntranceStrength = modernEntranceStrength(blockX, blockY, blockZ, surfaceY, densityThreshold);
-        double graphAlreadyOpen = clampedMap(density, densityThreshold + 0.24D, densityThreshold - 0.02D,
-                0.0D, 1.0D);
-        double verticalStrength = clampedMap(depthBelowSurface, 42.0D, 0.0D, 0.0D, 1.0D);
+        double modernEntranceStrength = surfaceEntranceStrength(blockX, blockY, blockZ, surfaceY, densityThreshold);
+        double graphAlreadyOpen = graphOpenStrength(density, densityThreshold);
+        double verticalStrength = clampedMap(depthBelowSurface, SURFACE_ENTRANCE_MAX_DEPTH, 0.0D, 0.0D, 1.0D);
 
-        return Math.max(modernEntranceStrength, graphAlreadyOpen * modernEntranceStrength) * verticalStrength;
+        return Math.max(modernEntranceStrength, graphAlreadyOpen * verticalStrength);
     }
 
     private double modernEntranceStrength(int blockX, int blockY, int blockZ, int surfaceY,
@@ -128,6 +158,10 @@ public class Mojang118CaveDensitySampler {
 
         return clampedMap(5.0D * entranceDensity, densityThreshold + 0.26D,
                 densityThreshold - 0.08D, 0.0D, 1.0D);
+    }
+
+    private double graphOpenStrength(double density, double densityThreshold) {
+        return clampedMap(density, densityThreshold + 0.20D, densityThreshold - 0.04D, 0.0D, 1.0D);
     }
 
     private double slopedCheese(int blockX, double mojangY, int blockZ) {

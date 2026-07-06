@@ -5,9 +5,9 @@ import net.minecraftforge.common.config.Config;
 public class ConfigSurfaceCave {
     @Config.Name("Enable Surface Caves")
     @Config.Comment(
-        "Set to true to enable vanilla-like caves which provide nice, natural-looking openings at the surface.\n" +
-        "Default: true")
-    public boolean enableSurfaceCaves = true;
+        "Set to true to enable legacy vanilla-like caves near the surface. Keep this disabled for the modern 1.18-style entrance field.\n" +
+        "Default: false")
+    public boolean enableSurfaceCaves = false;
 
     @Config.Name("Surface Cave Minimum Altitude")
     @Config.Comment(

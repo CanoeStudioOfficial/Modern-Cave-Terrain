@@ -22,6 +22,7 @@ public class Mojang118CaveCarver implements ICarver {
     private final int surfaceCutoff;
     private final int priority;
     private final int seaLevel;
+    private final int liquidAltitude;
     private final double densityThreshold;
     private final boolean replaceFloatingGravel;
     private final boolean debugVisualizer;
@@ -33,6 +34,7 @@ public class Mojang118CaveCarver implements ICarver {
         this.surfaceCutoff = config.mojang118CaveSurfaceCutoffDepth.get();
         this.priority = config.mojang118CavePriority.get();
         this.seaLevel = world.getSeaLevel();
+        this.liquidAltitude = config.liquidAltitude.get();
         this.densityThreshold = config.mojang118CaveDensityThreshold.get();
         this.replaceFloatingGravel = config.replaceFloatingGravel.get();
         this.debugVisualizer = config.debugVisualizer.get();
@@ -42,7 +44,7 @@ public class Mojang118CaveCarver implements ICarver {
                 config.mojang118CaveHorizontalScale.get(),
                 config.mojang118CaveVerticalScale.get()
         );
-        this.aquiferSampler = new Mojang118AquiferSampler(world.getSeed());
+        this.aquiferSampler = new Mojang118AquiferSampler(world.getSeed(), config.liquidAltitude.get());
 
         if (bottomY > topY) {
             ModernCaveTerrain.LOGGER.warn("Warning: Min altitude for 1.18-style caves should not be greater than max altitude.");
@@ -59,11 +61,14 @@ public class Mojang118CaveCarver implements ICarver {
         boolean allowSurfaceEntrance = !flooded;
 
         for (int y = topY; y >= bottomY; y--) {
-            double density = densitySampler.sampleDensity(blockX, y, blockZ);
-            density = densitySampler.applySurfaceAdjustment(density, blockX, y, blockZ, topY, bottomY,
+            double rawDensity = densitySampler.sampleDensity(blockX, y, blockZ);
+            double density = densitySampler.applySurfaceAdjustment(rawDensity, blockX, y, blockZ, topY, bottomY,
                     surfaceCutoff, allowSurfaceEntrance, densityThreshold);
 
-            boolean digBlock = density <= densityThreshold;
+            boolean surfaceEntrance = allowSurfaceEntrance
+                    && densitySampler.shouldCarveSurfaceEntrance(rawDensity, density, blockX, y, blockZ, topY,
+                    densityThreshold);
+            boolean digBlock = density <= densityThreshold || surfaceEntrance;
             if (debugVisualizer) {
                 CarverUtils.debugDigBlockLocal(primer, localX, y, localZ, debugBlock, digBlock);
                 continue;
@@ -74,14 +79,21 @@ public class Mojang118CaveCarver implements ICarver {
             }
 
             airBlockState = aquiferSampler.computeSubstance(blockX, y, blockZ, density, noiseChunk, seaLevel, flooded);
+            if (airBlockState == null && surfaceEntrance) {
+                airBlockState = Blocks.AIR.getDefaultState();
+            }
             if (airBlockState == null) {
                 continue;
             }
             if (airBlockState.getMaterial() == Material.WATER
-                    && densitySampler.isSurfaceEntrance(blockX, y, blockZ, topY, densityThreshold)) {
+                    && (surfaceEntrance || densitySampler.isSurfaceEntrance(blockX, y, blockZ, topY,
+                    densityThreshold))) {
                 airBlockState = Blocks.AIR.getDefaultState();
             }
-            if (isLeakingFluidToSurface(primer, localX, y, localZ, airBlockState, topY, flooded)) {
+            if (isLeakingFluidToSurface(primer, localX, y, localZ, airBlockState, topY, flooded, surfaceEntrance)) {
+                airBlockState = Blocks.AIR.getDefaultState();
+            }
+            if (isExposedLavaWall(primer, localX, y, localZ, airBlockState)) {
                 airBlockState = Blocks.AIR.getDefaultState();
             }
             CarverUtils.digBlockLocal(primer, localX, y, localZ, biome, airBlockState, null, -1, replaceFloatingGravel);
@@ -89,19 +101,25 @@ public class Mojang118CaveCarver implements ICarver {
     }
 
     private boolean isLeakingFluidToSurface(ChunkPrimer primer, int localX, int y, int localZ, IBlockState state,
-                                            int surfaceY, boolean flooded) {
+                                            int surfaceY, boolean flooded, boolean surfaceEntrance) {
         if (flooded || state.getMaterial() != Material.WATER) {
             return false;
         }
-        if (surfaceY - y > 18) {
+        int leakDepth = surfaceEntrance ? 44 : 18;
+        if (surfaceY - y > leakDepth) {
             return false;
         }
 
         return isAirOrOutside(primer, localX, y + 1, localZ)
+                || isAirOrOutside(primer, localX, y + 2, localZ)
                 || isAirOrOutside(primer, localX + 1, y, localZ)
                 || isAirOrOutside(primer, localX - 1, y, localZ)
                 || isAirOrOutside(primer, localX, y, localZ + 1)
-                || isAirOrOutside(primer, localX, y, localZ - 1);
+                || isAirOrOutside(primer, localX, y, localZ - 1)
+                || isAirOrOutside(primer, localX + 1, y + 1, localZ)
+                || isAirOrOutside(primer, localX - 1, y + 1, localZ)
+                || isAirOrOutside(primer, localX, y + 1, localZ + 1)
+                || isAirOrOutside(primer, localX, y + 1, localZ - 1);
     }
 
     private boolean isAirOrOutside(ChunkPrimer primer, int localX, int y, int localZ) {
@@ -110,6 +128,21 @@ public class Mojang118CaveCarver implements ICarver {
         }
 
         return primer.getBlockState(localX, y, localZ).getBlock() == Blocks.AIR;
+    }
+
+    private boolean isExposedLavaWall(ChunkPrimer primer, int localX, int y, int localZ, IBlockState state) {
+        if (state.getMaterial() != Material.LAVA) {
+            return false;
+        }
+        if (y <= liquidAltitude + 1) {
+            return false;
+        }
+
+        return isAirOrOutside(primer, localX, y + 1, localZ)
+                || isAirOrOutside(primer, localX + 1, y, localZ)
+                || isAirOrOutside(primer, localX - 1, y, localZ)
+                || isAirOrOutside(primer, localX, y, localZ + 1)
+                || isAirOrOutside(primer, localX, y, localZ - 1);
     }
 
     private boolean isOppositeFluidAdjacent(ChunkPrimer primer, int localX, int y, int localZ, IBlockState fluidState) {

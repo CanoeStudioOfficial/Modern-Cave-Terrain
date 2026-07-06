@@ -121,6 +121,10 @@ public final class ModernCaveTerrainConfig {
         return getFloat(ModernCaveTerrainConfigOptions.MOJANG_118_CAVE_VERTICAL_SCALE);
     }
 
+    public int getLiquidAltitude() {
+        return getInt(ModernCaveTerrainConfigOptions.LIQUID_ALTITUDE);
+    }
+
     ConfigHolder unwrap() {
         return config;
     }

@@ -289,17 +289,24 @@ public final class ModernCaveTerrainAPI {
                 world.getSeed(),
                 config.getMojang118StyleCaveHorizontalScale(),
                 config.getMojang118StyleCaveVerticalScale());
-        double density = densitySampler.sampleDensity(blockX, blockY, blockZ);
-        density = densitySampler.applySurfaceAdjustment(density, blockX, blockY, blockZ, surfaceY, bottomY,
+        double rawDensity = densitySampler.sampleDensity(blockX, blockY, blockZ);
+        double density = densitySampler.applySurfaceAdjustment(rawDensity, blockX, blockY, blockZ, surfaceY, bottomY,
                 config.getMojang118StyleCaveSurfaceCutoffDepth(), surfaceY > world.getSeaLevel(),
                 config.getMojang118StyleCaveDensityThreshold());
 
         double threshold = config.getMojang118StyleCaveDensityThreshold();
-        boolean open = density <= threshold;
-        Mojang118AquiferSampler aquiferSampler = new Mojang118AquiferSampler(world.getSeed());
+        boolean surfaceEntrance = surfaceY > world.getSeaLevel()
+                && densitySampler.shouldCarveSurfaceEntrance(rawDensity, density, blockX, blockY, blockZ, surfaceY,
+                threshold);
+        boolean open = density <= threshold || surfaceEntrance;
+        Mojang118AquiferSampler aquiferSampler = new Mojang118AquiferSampler(world.getSeed(),
+                config.getLiquidAltitude());
         Mojang118NoiseChunk noiseChunk = new Mojang118NoiseChunk(world, blockX, blockZ, surfaceY);
         IBlockState substance = aquiferSampler.computeSubstance(blockX, blockY, blockZ, density, noiseChunk,
                 world.getSeaLevel(), surfaceY <= world.getSeaLevel());
+        if (surfaceEntrance && substance != null && substance.getBlock() == Blocks.WATER) {
+            substance = Blocks.AIR.getDefaultState();
+        }
         IBlockState fluidState = substance != null && substance.getBlock() != Blocks.AIR ? substance : null;
 
         return new ModernCaveTerrainCaveSample(blockX, blockY, blockZ, density, threshold, open,
