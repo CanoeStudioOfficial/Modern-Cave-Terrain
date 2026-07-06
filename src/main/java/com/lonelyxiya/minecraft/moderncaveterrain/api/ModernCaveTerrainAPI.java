@@ -26,7 +26,6 @@ import net.minecraftforge.fml.common.Loader;
 
 import java.io.File;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Public API entry point for Modern Cave Terrain.
@@ -38,9 +37,6 @@ public final class ModernCaveTerrainAPI {
     public static final String MOD_ID = ModernCaveTerrainSettings.MOD_ID;
     public static final String NAME = ModernCaveTerrainSettings.NAME;
     public static final String VERSION = ModernCaveTerrainSettings.VERSION;
-    private static final List<ModernCaveTerrainCaveDecorator> CAVE_DECORATORS = new CopyOnWriteArrayList<>();
-    private static final List<ModernCaveTerrainUndergroundBiomeResolver> UNDERGROUND_BIOME_RESOLVERS =
-            new CopyOnWriteArrayList<>();
 
     private ModernCaveTerrainAPI() {}
 
@@ -190,57 +186,6 @@ public final class ModernCaveTerrainAPI {
     }
 
     /**
-     * Registers a chunk-level cave decorator.
-     *
-     * <p>Decorators are invoked after Modern Cave Terrain finishes carving a chunk, while the chunk is still represented
-     * by a {@link ChunkPrimer}. This is intended for cave-biome decoration systems driven by the generic
-     * pseudo-3D underground biome API.</p>
-     *
-     * @param decorator decorator instance
-     */
-    public static void registerCaveDecorator(ModernCaveTerrainCaveDecorator decorator) {
-        if (decorator == null) {
-            throw new IllegalArgumentException("Modern Cave Terrain cave decorator cannot be null");
-        }
-        CAVE_DECORATORS.add(decorator);
-    }
-
-    /**
-     * Unregisters a cave decorator.
-     *
-     * @param decorator decorator instance
-     * @return true when the decorator was registered and removed
-     */
-    public static boolean unregisterCaveDecorator(ModernCaveTerrainCaveDecorator decorator) {
-        return CAVE_DECORATORS.remove(decorator);
-    }
-
-    /**
-     * Registers an underground biome resolver.
-     *
-     * <p>Resolvers run after the built-in pseudo-3D multi-noise sample and may replace it. This lets decoration
-     * mods add or redirect underground biome bands without replacing Modern Cave Terrain internals.</p>
-     *
-     * @param resolver resolver instance
-     */
-    public static void registerUndergroundBiomeResolver(ModernCaveTerrainUndergroundBiomeResolver resolver) {
-        if (resolver == null) {
-            throw new IllegalArgumentException("Modern Cave Terrain underground biome resolver cannot be null");
-        }
-        UNDERGROUND_BIOME_RESOLVERS.add(resolver);
-    }
-
-    /**
-     * Unregisters an underground biome resolver.
-     *
-     * @param resolver resolver instance
-     * @return true when the resolver was registered and removed
-     */
-    public static boolean unregisterUndergroundBiomeResolver(ModernCaveTerrainUndergroundBiomeResolver resolver) {
-        return UNDERGROUND_BIOME_RESOLVERS.remove(resolver);
-    }
-
-    /**
      * Registers a pseudo-3D underground biome definition.
      *
      * <p>This is the preferred extension point for cave-biome mods. It follows the same lightweight idea as
@@ -281,18 +226,24 @@ public final class ModernCaveTerrainAPI {
     }
 
     /**
+     * Resolves the registered underground biome definition that matches a sample.
+     *
+     * @param world world instance
+     * @param sample underground biome sample
+     * @return matching registered definition or null
+     */
+    public static ModernCaveTerrainUndergroundBiomeDefinition resolveRegisteredUndergroundBiome(
+            World world, ModernCaveTerrainUndergroundBiomeSample sample) {
+        return ModernCaveTerrainUndergroundBiomeRegistry.resolveDefinition(world, sample);
+    }
+
+    /**
      * Called by Modern Cave Terrain internals after carving.
      */
     public static void decorateCaves(World world, ChunkPrimer primer, int chunkX, int chunkZ, ConfigHolder config) {
-        if (CAVE_DECORATORS.isEmpty()) {
-            return;
-        }
-
         ModernCaveTerrainCaveDecorationContext context = new ModernCaveTerrainCaveDecorationContext(
                 world, primer, chunkX, chunkZ, new ModernCaveTerrainConfig(config));
-        for (ModernCaveTerrainCaveDecorator decorator : CAVE_DECORATORS) {
-            decorator.decorate(context);
-        }
+        ModernCaveTerrainUndergroundBiomeRegistry.decorate(context);
     }
 
     /**
@@ -396,12 +347,6 @@ public final class ModernCaveTerrainAPI {
         ModernCaveTerrainUndergroundBiomeSample sample =
                 ModernCaveTerrainUndergroundBiomeSampler.sample(world, config, blockX, blockY, blockZ, fluidState);
         sample = ModernCaveTerrainUndergroundBiomeRegistry.resolve(world, sample);
-        for (ModernCaveTerrainUndergroundBiomeResolver resolver : UNDERGROUND_BIOME_RESOLVERS) {
-            ModernCaveTerrainUndergroundBiomeSample replacement = resolver.resolve(world, sample);
-            if (replacement != null) {
-                sample = replacement;
-            }
-        }
         return sample;
     }
 }

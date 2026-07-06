@@ -19,6 +19,7 @@ public final class ModernCaveTerrainUndergroundBiomeDefinition {
     private final Set<ResourceLocation> surfaceBiomes;
     private final Set<ResourceLocation> fallbackNeighborBiomes;
     private final ModernCaveTerrainUndergroundBiomeSelector selector;
+    private final ModernCaveTerrainUndergroundBiomeDecorator decorator;
 
     private ModernCaveTerrainUndergroundBiomeDefinition(Builder builder) {
         this.id = builder.id;
@@ -29,6 +30,7 @@ public final class ModernCaveTerrainUndergroundBiomeDefinition {
         this.surfaceBiomes = Collections.unmodifiableSet(new HashSet<>(builder.surfaceBiomes));
         this.fallbackNeighborBiomes = Collections.unmodifiableSet(new HashSet<>(builder.fallbackNeighborBiomes));
         this.selector = builder.selector;
+        this.decorator = builder.decorator;
     }
 
     public ResourceLocation getId() {
@@ -63,6 +65,10 @@ public final class ModernCaveTerrainUndergroundBiomeDefinition {
         return selector;
     }
 
+    public ModernCaveTerrainUndergroundBiomeDecorator getDecorator() {
+        return decorator;
+    }
+
     public boolean hasSurfaceBiomeRules() {
         return !surfaceBiomes.isEmpty();
     }
@@ -84,6 +90,7 @@ public final class ModernCaveTerrainUndergroundBiomeDefinition {
         private final Set<ResourceLocation> surfaceBiomes = new HashSet<>();
         private final Set<ResourceLocation> fallbackNeighborBiomes = new HashSet<>();
         private ModernCaveTerrainUndergroundBiomeSelector selector;
+        private ModernCaveTerrainUndergroundBiomeDecorator decorator;
 
         private Builder(ResourceLocation id) {
             if (id == null) {
@@ -177,6 +184,11 @@ public final class ModernCaveTerrainUndergroundBiomeDefinition {
 
         public Builder selector(ModernCaveTerrainUndergroundBiomeSelector selector) {
             this.selector = selector;
+            return this;
+        }
+
+        public Builder decorator(ModernCaveTerrainUndergroundBiomeDecorator decorator) {
+            this.decorator = decorator;
             return this;
         }
 

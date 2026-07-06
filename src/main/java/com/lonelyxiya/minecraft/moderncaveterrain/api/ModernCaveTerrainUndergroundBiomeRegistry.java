@@ -63,6 +63,21 @@ public final class ModernCaveTerrainUndergroundBiomeRegistry {
 
     static ModernCaveTerrainUndergroundBiomeSample resolve(World world,
                                                            ModernCaveTerrainUndergroundBiomeSample sample) {
+        ModernCaveTerrainUndergroundBiomeDefinition best = resolveDefinition(world, sample);
+        return best == null ? sample : sample.withBiome(best.getCaveBiomeType(), best.getId());
+    }
+
+    static void decorate(ModernCaveTerrainCaveDecorationContext context) {
+        for (ModernCaveTerrainUndergroundBiomeDefinition definition : DEFINITIONS) {
+            ModernCaveTerrainUndergroundBiomeDecorator decorator = definition.getDecorator();
+            if (decorator != null) {
+                decorator.decorate(context, definition);
+            }
+        }
+    }
+
+    public static ModernCaveTerrainUndergroundBiomeDefinition resolveDefinition(World world,
+                                                                               ModernCaveTerrainUndergroundBiomeSample sample) {
         ModernCaveTerrainUndergroundBiomeDefinition best = null;
         double bestWeight = 0.0D;
 
@@ -79,7 +94,7 @@ public final class ModernCaveTerrainUndergroundBiomeRegistry {
             }
         }
 
-        return best == null ? sample : sample.withBiome(best.getCaveBiomeType(), best.getId());
+        return best;
     }
 
     private static double getMatchWeight(World world, ModernCaveTerrainUndergroundBiomeSample sample,
