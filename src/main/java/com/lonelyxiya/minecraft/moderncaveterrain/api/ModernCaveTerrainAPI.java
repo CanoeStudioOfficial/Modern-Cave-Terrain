@@ -15,6 +15,7 @@ import com.lonelyxiya.minecraft.moderncaveterrain.world.mineshaft.MapGenModernMi
 import com.lonelyxiya.minecraft.moderncaveterrain.world.ravine.MapGenModernCanyon;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.init.Blocks;
+import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.ChunkPrimer;
@@ -240,6 +241,46 @@ public final class ModernCaveTerrainAPI {
     }
 
     /**
+     * Registers a pseudo-3D underground biome definition.
+     *
+     * <p>This is the preferred extension point for cave-biome mods. It follows the same lightweight idea as
+     * biome-to-cave mappings used by older 1.12.2 cave mods, but targets the 3D underground biome sample instead
+     * of replacing the whole cave generator.</p>
+     *
+     * @param definition underground biome definition
+     */
+    public static void registerUndergroundBiome(ModernCaveTerrainUndergroundBiomeDefinition definition) {
+        ModernCaveTerrainUndergroundBiomeRegistry.register(definition);
+    }
+
+    /**
+     * Unregisters a pseudo-3D underground biome definition.
+     *
+     * @param id underground biome id
+     * @return true when a definition was removed
+     */
+    public static boolean unregisterUndergroundBiome(ResourceLocation id) {
+        return ModernCaveTerrainUndergroundBiomeRegistry.unregister(id);
+    }
+
+    /**
+     * Gets a registered pseudo-3D underground biome definition.
+     *
+     * @param id underground biome id
+     * @return definition or null
+     */
+    public static ModernCaveTerrainUndergroundBiomeDefinition getUndergroundBiome(ResourceLocation id) {
+        return ModernCaveTerrainUndergroundBiomeRegistry.get(id);
+    }
+
+    /**
+     * Gets all registered pseudo-3D underground biome definitions.
+     */
+    public static List<ModernCaveTerrainUndergroundBiomeDefinition> getRegisteredUndergroundBiomes() {
+        return ModernCaveTerrainUndergroundBiomeRegistry.getDefinitions();
+    }
+
+    /**
      * Called by Modern Cave Terrain internals after carving.
      */
     public static void decorateCaves(World world, ChunkPrimer primer, int chunkX, int chunkZ, ConfigHolder config) {
@@ -354,6 +395,7 @@ public final class ModernCaveTerrainAPI {
                                                                                  IBlockState fluidState) {
         ModernCaveTerrainUndergroundBiomeSample sample =
                 ModernCaveTerrainUndergroundBiomeSampler.sample(world, config, blockX, blockY, blockZ, fluidState);
+        sample = ModernCaveTerrainUndergroundBiomeRegistry.resolve(world, sample);
         for (ModernCaveTerrainUndergroundBiomeResolver resolver : UNDERGROUND_BIOME_RESOLVERS) {
             ModernCaveTerrainUndergroundBiomeSample replacement = resolver.resolve(world, sample);
             if (replacement != null) {
