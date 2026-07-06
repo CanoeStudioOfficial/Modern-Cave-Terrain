@@ -22,6 +22,7 @@ public class Mojang118AquiferSampler {
     private static final int CELL_HEIGHT = 12;
     private static final int FLUID_LEVEL_CELL_HEIGHT = 40;
     private static final double PRESSURE_SIMILARITY_RANGE = 25.0D;
+    private static final double FLOWING_UPDATE_SIMILARITY = similarity(10 * 10, 12 * 12);
 
     private final long seed;
     private final int lavaBlockYLimit;
@@ -33,6 +34,7 @@ public class Mojang118AquiferSampler {
     private final MojangNormalNoise lavaNoise;
     private final Map<Long, Long> locationCache = new HashMap<>();
     private final Map<Long, FluidStatus> statusCache = new HashMap<>();
+    private boolean shouldScheduleFluidUpdate;
 
     public Mojang118AquiferSampler(long seed) {
         this(seed, DEFAULT_LAVA_ALTITUDE);
@@ -41,9 +43,9 @@ public class Mojang118AquiferSampler {
     public Mojang118AquiferSampler(long seed, int liquidAltitude) {
         this.seed = seed;
         int lavaAltitude = clampInt(liquidAltitude, 0, 255);
-        this.lavaBlockYLimit = lavaAltitude + 1;
+        this.lavaBlockYLimit = lavaAltitude;
         this.lavaFluidLevel = (int) Math.floor(Mojang118NoiseChunk.toMojangY(Math.min(255, lavaAltitude + 1)));
-        this.randomLavaFluidLevel = (int) Math.floor(Mojang118NoiseChunk.toMojangY(Math.min(255, lavaAltitude + 3)));
+        this.randomLavaFluidLevel = lavaFluidLevel;
         this.barrierNoise = MojangNormalNoise.create(seed, "aquifer_barrier", -3, 1.0D);
         this.floodednessNoise = MojangNormalNoise.create(seed, "aquifer_fluid_level_floodedness", -7, 1.0D);
         this.fluidLevelSpreadNoise = MojangNormalNoise.create(seed, "aquifer_fluid_level_spread", -5, 1.0D);
@@ -53,6 +55,7 @@ public class Mojang118AquiferSampler {
     public IBlockState computeSubstance(int blockX, int blockY, int blockZ, double density,
                                         Mojang118NoiseChunk noiseChunk, int seaLevel, boolean flooded) {
         if (density > 0.0D) {
+            shouldScheduleFluidUpdate = false;
             return null;
         }
 
@@ -60,6 +63,7 @@ public class Mojang118AquiferSampler {
         FluidStatus globalFluid = computeGlobalFluid(mojangY, seaLevel, flooded);
         IBlockState globalState = globalFluid.at(mojangY);
         if (globalState.getBlock() == Blocks.LAVA) {
+            shouldScheduleFluidUpdate = false;
             return blockY <= lavaBlockYLimit ? globalState : Blocks.AIR.getDefaultState();
         }
 
@@ -69,24 +73,30 @@ public class Mojang118AquiferSampler {
         ClosestCells closest = findClosestCells(blockX, mojangY, blockZ, gridX, gridY, gridZ);
         FluidStatus status1 = getAquiferStatus(closest.index1, noiseChunk, seaLevel, flooded);
         IBlockState substance = status1.at(mojangY);
-        if (substance.getBlock() == Blocks.LAVA && blockY > lavaBlockYLimit) {
-            substance = Blocks.AIR.getDefaultState();
-        }
+        substance = protectLavaState(substance, blockY);
         double similarity12 = similarity(closest.distance1, closest.distance2);
 
         if (similarity12 <= 0.0D) {
+            if (similarity12 >= FLOWING_UPDATE_SIMILARITY) {
+                FluidStatus status2 = getAquiferStatus(closest.index2, noiseChunk, seaLevel, flooded);
+                shouldScheduleFluidUpdate = !status1.equals(status2);
+            } else {
+                shouldScheduleFluidUpdate = false;
+            }
             return substance;
         }
 
         if (substance.getBlock() == Blocks.WATER
                 && computeGlobalFluid(Mojang118NoiseChunk.toMojangY(blockY - 1), seaLevel, flooded)
                 .at(Mojang118NoiseChunk.toMojangY(blockY - 1)).getBlock() == Blocks.LAVA) {
+            shouldScheduleFluidUpdate = true;
             return substance;
         }
 
         FluidStatus status2 = getAquiferStatus(closest.index2, noiseChunk, seaLevel, flooded);
         double barrier = barrierPressure(blockX, mojangY, blockZ, status1, status2);
         if (density + similarity12 * barrier > 0.0D) {
+            shouldScheduleFluidUpdate = false;
             return null;
         }
 
@@ -95,6 +105,7 @@ public class Mojang118AquiferSampler {
         if (similarity13 > 0.0D) {
             double pressure13 = similarity12 * similarity13 * barrierPressure(blockX, mojangY, blockZ, status1, status3);
             if (density + pressure13 > 0.0D) {
+                shouldScheduleFluidUpdate = false;
                 return null;
             }
         }
@@ -103,11 +114,28 @@ public class Mojang118AquiferSampler {
         if (similarity23 > 0.0D) {
             double pressure23 = similarity12 * similarity23 * barrierPressure(blockX, mojangY, blockZ, status2, status3);
             if (density + pressure23 > 0.0D) {
+                shouldScheduleFluidUpdate = false;
                 return null;
             }
         }
 
+        boolean mayFlow12 = !status1.equals(status2);
+        boolean mayFlow23 = similarity23 >= FLOWING_UPDATE_SIMILARITY && !status2.equals(status3);
+        boolean mayFlow13 = similarity13 >= FLOWING_UPDATE_SIMILARITY && !status1.equals(status3);
+        if (!mayFlow12 && !mayFlow23 && !mayFlow13) {
+            boolean mayFlow14 = similarity13 >= FLOWING_UPDATE_SIMILARITY
+                    && similarity(closest.distance1, closest.distance4) >= FLOWING_UPDATE_SIMILARITY
+                    && !status1.equals(getAquiferStatus(closest.index4, noiseChunk, seaLevel, flooded));
+            shouldScheduleFluidUpdate = mayFlow14;
+        } else {
+            shouldScheduleFluidUpdate = true;
+        }
+
         return substance;
+    }
+
+    public boolean shouldScheduleFluidUpdate() {
+        return shouldScheduleFluidUpdate;
     }
 
     public IBlockState sampleFluidState(int blockX, int blockY, int blockZ, int surfaceY, int seaLevel,
@@ -116,9 +144,7 @@ public class Mojang118AquiferSampler {
         double mojangY = Mojang118NoiseChunk.toMojangY(blockY);
         FluidStatus status = computeFluid(blockX, mojangY, blockZ, noiseChunk, seaLevel, flooded);
         IBlockState state = status.at(mojangY);
-        if (state.getBlock() == Blocks.LAVA && blockY > lavaBlockYLimit) {
-            return null;
-        }
+        state = protectLavaState(state, blockY);
         return state.getBlock() == Blocks.AIR ? null : state;
     }
 
@@ -330,6 +356,14 @@ public class Mojang118AquiferSampler {
                 || first.getBlock() == Blocks.LAVA && second.getBlock() == Blocks.WATER;
     }
 
+    private IBlockState protectLavaState(IBlockState state, int blockY) {
+        if (state.getBlock() == Blocks.LAVA && blockY > lavaBlockYLimit) {
+            return Blocks.AIR.getDefaultState();
+        }
+
+        return state;
+    }
+
     private double sample(MojangNormalNoise noise, int blockX, double mojangY, int blockZ, double xzScale, double yScale) {
         return noise.getValue(blockX * xzScale, mojangY * yScale, blockZ * xzScale);
     }
@@ -436,12 +470,16 @@ public class Mojang118AquiferSampler {
         private int distance1 = Integer.MAX_VALUE;
         private int distance2 = Integer.MAX_VALUE;
         private int distance3 = Integer.MAX_VALUE;
+        private int distance4 = Integer.MAX_VALUE;
         private long index1;
         private long index2;
         private long index3;
+        private long index4;
 
         private void accept(long index, int distance) {
             if (distance1 >= distance) {
+                index4 = index3;
+                distance4 = distance3;
                 index3 = index2;
                 distance3 = distance2;
                 index2 = index1;
@@ -449,13 +487,20 @@ public class Mojang118AquiferSampler {
                 index1 = index;
                 distance1 = distance;
             } else if (distance2 >= distance) {
+                index4 = index3;
+                distance4 = distance3;
                 index3 = index2;
                 distance3 = distance2;
                 index2 = index;
                 distance2 = distance;
             } else if (distance3 >= distance) {
+                index4 = index3;
+                distance4 = distance3;
                 index3 = index;
                 distance3 = distance;
+            } else if (distance4 >= distance) {
+                index4 = index;
+                distance4 = distance;
             }
         }
     }
@@ -471,6 +516,26 @@ public class Mojang118AquiferSampler {
 
         private IBlockState at(double mojangY) {
             return mojangY < fluidLevel ? fluidType : Blocks.AIR.getDefaultState();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (!(obj instanceof FluidStatus)) {
+                return false;
+            }
+
+            FluidStatus other = (FluidStatus) obj;
+            return fluidLevel == other.fluidLevel && fluidType.equals(other.fluidType);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = fluidLevel;
+            result = 31 * result + fluidType.hashCode();
+            return result;
         }
     }
 }

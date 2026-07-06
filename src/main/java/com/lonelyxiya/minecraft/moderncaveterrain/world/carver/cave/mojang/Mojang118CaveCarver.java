@@ -93,7 +93,7 @@ public class Mojang118CaveCarver implements ICarver {
             if (isLeakingFluidToSurface(primer, localX, y, localZ, airBlockState, topY, flooded, surfaceEntrance)) {
                 airBlockState = Blocks.AIR.getDefaultState();
             }
-            if (isExposedLavaWall(primer, localX, y, localZ, airBlockState)) {
+            if (shouldSuppressUnstableFluid(primer, localX, y, localZ, airBlockState)) {
                 airBlockState = Blocks.AIR.getDefaultState();
             }
             CarverUtils.digBlockLocal(primer, localX, y, localZ, biome, airBlockState, null, -1, replaceFloatingGravel);
@@ -130,19 +130,29 @@ public class Mojang118CaveCarver implements ICarver {
         return primer.getBlockState(localX, y, localZ).getBlock() == Blocks.AIR;
     }
 
-    private boolean isExposedLavaWall(ChunkPrimer primer, int localX, int y, int localZ, IBlockState state) {
-        if (state.getMaterial() != Material.LAVA) {
-            return false;
-        }
-        if (y <= liquidAltitude + 1) {
+    private boolean shouldSuppressUnstableFluid(ChunkPrimer primer, int localX, int y, int localZ, IBlockState state) {
+        if (state.getMaterial() != Material.LAVA && state.getMaterial() != Material.WATER) {
             return false;
         }
 
-        return isAirOrOutside(primer, localX, y + 1, localZ)
-                || isAirOrOutside(primer, localX + 1, y, localZ)
-                || isAirOrOutside(primer, localX - 1, y, localZ)
-                || isAirOrOutside(primer, localX, y, localZ + 1)
-                || isAirOrOutside(primer, localX, y, localZ - 1);
+        if (state.getMaterial() == Material.LAVA && y > liquidAltitude) {
+            return true;
+        }
+
+        if (!aquiferSampler.shouldScheduleFluidUpdate()) {
+            return false;
+        }
+
+        if (state.getMaterial() == Material.LAVA) {
+            return isOppositeFluidAdjacent(primer, localX, y, localZ, state)
+                    || isAirOrOutside(primer, localX, y + 1, localZ)
+                    || isAirOrOutside(primer, localX + 1, y, localZ)
+                    || isAirOrOutside(primer, localX - 1, y, localZ)
+                    || isAirOrOutside(primer, localX, y, localZ + 1)
+                    || isAirOrOutside(primer, localX, y, localZ - 1);
+        }
+
+        return isOppositeFluidAdjacent(primer, localX, y, localZ, state);
     }
 
     private boolean isOppositeFluidAdjacent(ChunkPrimer primer, int localX, int y, int localZ, IBlockState fluidState) {
