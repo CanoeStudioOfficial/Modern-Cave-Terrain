@@ -13,7 +13,7 @@ public class ModernCaveTerrainSettings {
     public static final boolean USE_META_DATA = true;
     public static final String MOD_ID = "moderncaveterrain";
     public static final String NAME = "Modern Cave Terrain";
-    public static final String VERSION = "2.0.8";
+    public static final String VERSION = "2.1.0";
 
     public static final String SERVER_PROXY = "com.lonelyxiya.minecraft.moderncaveterrain.proxy.ServerProxy";
     public static final String CLIENT_PROXY = "com.lonelyxiya.minecraft.moderncaveterrain.proxy.ClientProxy";
