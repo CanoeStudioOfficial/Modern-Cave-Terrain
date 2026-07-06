@@ -23,6 +23,7 @@ public class Mojang118CaveCarver implements ICarver {
     private final int priority;
     private final int seaLevel;
     private final int liquidAltitude;
+    private final int localAquiferSurfaceBuffer;
     private final double densityThreshold;
     private final boolean replaceFloatingGravel;
     private final boolean debugVisualizer;
@@ -35,6 +36,7 @@ public class Mojang118CaveCarver implements ICarver {
         this.priority = config.mojang118CavePriority.get();
         this.seaLevel = world.getSeaLevel();
         this.liquidAltitude = config.liquidAltitude.get();
+        this.localAquiferSurfaceBuffer = Math.max(24, config.mojang118CaveSurfaceCutoffDepth.get() + 16);
         this.densityThreshold = config.mojang118CaveDensityThreshold.get();
         this.replaceFloatingGravel = config.replaceFloatingGravel.get();
         this.debugVisualizer = config.debugVisualizer.get();
@@ -90,6 +92,9 @@ public class Mojang118CaveCarver implements ICarver {
                     densityThreshold))) {
                 airBlockState = Blocks.AIR.getDefaultState();
             }
+            if (isExposedLocalWater(primer, localX, y, localZ, airBlockState, topY, flooded)) {
+                airBlockState = Blocks.AIR.getDefaultState();
+            }
             if (isLeakingFluidToSurface(primer, localX, y, localZ, airBlockState, topY, flooded, surfaceEntrance)) {
                 airBlockState = Blocks.AIR.getDefaultState();
             }
@@ -120,6 +125,25 @@ public class Mojang118CaveCarver implements ICarver {
                 || isAirOrOutside(primer, localX - 1, y + 1, localZ)
                 || isAirOrOutside(primer, localX, y + 1, localZ + 1)
                 || isAirOrOutside(primer, localX, y + 1, localZ - 1);
+    }
+
+    private boolean isExposedLocalWater(ChunkPrimer primer, int localX, int y, int localZ, IBlockState state,
+                                        int surfaceY, boolean flooded) {
+        if (flooded || state.getMaterial() != Material.WATER) {
+            return false;
+        }
+        if (surfaceY - y <= localAquiferSurfaceBuffer) {
+            return true;
+        }
+        if (!aquiferSampler.shouldScheduleFluidUpdate()) {
+            return false;
+        }
+
+        return isAirOrOutside(primer, localX, y + 1, localZ)
+                || isAirOrOutside(primer, localX + 1, y, localZ)
+                || isAirOrOutside(primer, localX - 1, y, localZ)
+                || isAirOrOutside(primer, localX, y, localZ + 1)
+                || isAirOrOutside(primer, localX, y, localZ - 1);
     }
 
     private boolean isAirOrOutside(ChunkPrimer primer, int localX, int y, int localZ) {

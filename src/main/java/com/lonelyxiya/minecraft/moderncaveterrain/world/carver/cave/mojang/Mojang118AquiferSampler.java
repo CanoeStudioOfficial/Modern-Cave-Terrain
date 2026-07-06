@@ -23,6 +23,8 @@ public class Mojang118AquiferSampler {
     private static final int FLUID_LEVEL_CELL_HEIGHT = 40;
     private static final double PRESSURE_SIMILARITY_RANGE = 25.0D;
     private static final double FLOWING_UPDATE_SIMILARITY = similarity(10 * 10, 12 * 12);
+    private static final double MIN_LOCAL_AQUIFER_DEPTH = 56.0D;
+    private static final double MIN_LOCAL_AQUIFER_SURFACE_COVER = 24.0D;
 
     private final long seed;
     private final int lavaBlockYLimit;
@@ -252,7 +254,13 @@ public class Mojang118AquiferSampler {
 
         int fluidLevel = computeSurfaceLevel(x, mojangY, z, globalFluid, lowestPreliminarySurface,
                 surfaceAtCenterIsUnderGlobalFluidLevel);
-        return new FluidStatus(fluidLevel, computeFluidType(x, mojangY, z, globalFluid, fluidLevel));
+        boolean localWaterAllowed = isLocalWaterAllowed(globalFluid, mojangY, lowestPreliminarySurface, fluidLevel);
+        if (globalFluid.fluidType.getBlock() == Blocks.AIR && !localWaterAllowed) {
+            fluidLevel = NO_FLUID_LEVEL;
+        }
+
+        return new FluidStatus(fluidLevel, computeFluidType(x, mojangY, z, globalFluid, fluidLevel,
+                localWaterAllowed));
     }
 
     private FluidStatus computeGlobalFluid(double mojangY, int seaLevel, boolean flooded) {
@@ -300,13 +308,16 @@ public class Mojang118AquiferSampler {
         return Math.min(lowestPreliminarySurface, targetFluidSurfaceLevel);
     }
 
-    private IBlockState computeFluidType(int blockX, double mojangY, int blockZ, FluidStatus globalFluid, int fluidSurfaceLevel) {
-        IBlockState fluidType = globalFluid.fluidType.getBlock() == Blocks.AIR
-                ? Blocks.WATER.getDefaultState()
-                : globalFluid.fluidType;
+    private IBlockState computeFluidType(int blockX, double mojangY, int blockZ, FluidStatus globalFluid,
+                                         int fluidSurfaceLevel, boolean localWaterAllowed) {
+        IBlockState fluidType = globalFluid.fluidType;
+        if (fluidType.getBlock() == Blocks.AIR && localWaterAllowed) {
+            fluidType = Blocks.WATER.getDefaultState();
+        }
 
         if (fluidSurfaceLevel <= randomLavaFluidLevel
                 && fluidSurfaceLevel != NO_FLUID_LEVEL
+                && fluidType.getBlock() != Blocks.AIR
                 && fluidType.getBlock() != Blocks.LAVA) {
             int cellX = floorDiv(blockX, 64);
             int cellY = floorDiv((int) Math.floor(mojangY), FLUID_LEVEL_CELL_HEIGHT);
@@ -318,6 +329,21 @@ public class Mojang118AquiferSampler {
         }
 
         return fluidType;
+    }
+
+    private boolean isLocalWaterAllowed(FluidStatus globalFluid, double mojangY, int lowestPreliminarySurface,
+                                        int fluidSurfaceLevel) {
+        if (globalFluid.fluidType.getBlock() != Blocks.AIR) {
+            return false;
+        }
+        if (fluidSurfaceLevel == NO_FLUID_LEVEL) {
+            return false;
+        }
+
+        double depthBelowSurface = lowestPreliminarySurface - mojangY;
+        double coverAboveFluid = lowestPreliminarySurface - fluidSurfaceLevel;
+        return depthBelowSurface >= MIN_LOCAL_AQUIFER_DEPTH
+                && coverAboveFluid >= MIN_LOCAL_AQUIFER_SURFACE_COVER;
     }
 
     private double barrierPressure(int blockX, double mojangY, int blockZ, FluidStatus status1, FluidStatus status2) {
