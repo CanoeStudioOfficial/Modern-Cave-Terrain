@@ -13,7 +13,7 @@ public class Mojang118CaveDensitySampler {
     private static final double MOJANG_MIN_Y = -64.0D;
     private static final double MOJANG_HEIGHT = 384.0D;
     private static final double OLD_WORLD_MAX_Y = 255.0D;
-    private static final int SURFACE_ENTRANCE_MAX_DEPTH = 44;
+    private static final int SURFACE_ENTRANCE_MAX_DEPTH = 34;
 
     private final MojangNormalNoise caveCheese;
     private final MojangNormalNoise caveLayer;
@@ -96,10 +96,10 @@ public class Mojang118CaveDensitySampler {
         }
 
         int depthBelowSurface = surfaceY - blockY;
-        double mouthFade = clampedMap(depthBelowSurface, 0.0D, 12.0D, 1.0D, 0.0D);
-        double throatFade = clampedMap(depthBelowSurface, 4.0D, 36.0D, 0.55D, 0.0D);
+        double mouthFade = clampedMap(depthBelowSurface, 0.0D, 10.0D, 1.0D, 0.0D);
+        double throatFade = clampedMap(depthBelowSurface, 4.0D, 28.0D, 0.42D, 0.0D);
 
-        return density - entranceAperture * (mouthFade * 0.28D + throatFade * 0.16D);
+        return density - entranceAperture * (mouthFade * 0.20D + throatFade * 0.10D);
     }
 
     public boolean isSurfaceEntrance(int blockX, int blockY, int blockZ, int surfaceY, double densityThreshold) {
@@ -107,7 +107,7 @@ public class Mojang118CaveDensitySampler {
             return false;
         }
 
-        return surfaceEntranceStrength(blockX, blockY, blockZ, surfaceY, densityThreshold) > 0.54D;
+        return surfaceEntranceStrength(blockX, blockY, blockZ, surfaceY, densityThreshold) > 0.64D;
     }
 
     public boolean shouldCarveSurfaceEntrance(double rawDensity, double adjustedDensity, int blockX, int blockY,
@@ -122,9 +122,9 @@ public class Mojang118CaveDensitySampler {
         double depthFactor = clampedMap(depthBelowSurface, 0.0D, SURFACE_ENTRANCE_MAX_DEPTH, 1.0D, 0.18D);
         double openStrength = Math.max(entranceStrength, graphAlreadyOpen * depthFactor);
         double loosenedThreshold = densityThreshold + openStrength * clampedMap(depthBelowSurface, 0.0D,
-                SURFACE_ENTRANCE_MAX_DEPTH, 0.30D, 0.08D);
+                SURFACE_ENTRANCE_MAX_DEPTH, 0.22D, 0.05D);
 
-        return openStrength > 0.48D && adjustedDensity <= loosenedThreshold;
+        return openStrength > 0.58D && adjustedDensity <= loosenedThreshold;
     }
 
     public double surfaceEntranceStrength(int blockX, int blockY, int blockZ, int surfaceY,

@@ -15,6 +15,9 @@ import net.minecraft.world.chunk.ChunkPrimer;
  * Carves a 1.18-style cave density field into a 1.12.2 ChunkPrimer.
  */
 public class Mojang118CaveCarver implements ICarver {
+    private static final int SURFACE_WATER_SCAN_RADIUS = 2;
+    private static final int SURFACE_WATER_SCAN_HEIGHT = 12;
+
     private final Mojang118CaveDensitySampler densitySampler;
     private final Mojang118AquiferSampler aquiferSampler;
     private final int bottomY;
@@ -60,7 +63,8 @@ public class Mojang118CaveCarver implements ICarver {
         }
 
         IBlockState airBlockState;
-        boolean allowSurfaceEntrance = !flooded;
+        boolean surfaceWaterRisk = !flooded && hasSurfaceWaterNearby(primer, localX, localZ, topY);
+        boolean allowSurfaceEntrance = !flooded && !surfaceWaterRisk;
 
         for (int y = topY; y >= bottomY; y--) {
             double rawDensity = densitySampler.sampleDensity(blockX, y, blockZ);
@@ -87,6 +91,9 @@ public class Mojang118CaveCarver implements ICarver {
             if (airBlockState == null) {
                 continue;
             }
+            if (surfaceWaterRisk && isNearSurface(y, topY) && wouldExposeSurfaceWater(primer, localX, y, localZ)) {
+                continue;
+            }
             if (airBlockState.getMaterial() == Material.WATER
                     && (surfaceEntrance || densitySampler.isSurfaceEntrance(blockX, y, blockZ, topY,
                     densityThreshold))) {
@@ -103,6 +110,51 @@ public class Mojang118CaveCarver implements ICarver {
             }
             CarverUtils.digBlockLocal(primer, localX, y, localZ, biome, airBlockState, null, -1, replaceFloatingGravel);
         }
+    }
+
+    private boolean isNearSurface(int y, int surfaceY) {
+        return surfaceY - y <= surfaceCutoff + 12;
+    }
+
+    private boolean hasSurfaceWaterNearby(ChunkPrimer primer, int localX, int localZ, int surfaceY) {
+        int minY = Math.max(1, surfaceY - SURFACE_WATER_SCAN_HEIGHT);
+        int maxY = Math.min(255, surfaceY + SURFACE_WATER_SCAN_HEIGHT);
+        for (int x = localX - SURFACE_WATER_SCAN_RADIUS; x <= localX + SURFACE_WATER_SCAN_RADIUS; x++) {
+            for (int z = localZ - SURFACE_WATER_SCAN_RADIUS; z <= localZ + SURFACE_WATER_SCAN_RADIUS; z++) {
+                for (int y = maxY; y >= minY; y--) {
+                    if (isWater(primer, x, y, z)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private boolean wouldExposeSurfaceWater(ChunkPrimer primer, int localX, int y, int localZ) {
+        return isWaterOrOutside(primer, localX, y + 1, localZ)
+                || isWaterOrOutside(primer, localX, y + 2, localZ)
+                || isWaterOrOutside(primer, localX + 1, y, localZ)
+                || isWaterOrOutside(primer, localX - 1, y, localZ)
+                || isWaterOrOutside(primer, localX, y, localZ + 1)
+                || isWaterOrOutside(primer, localX, y, localZ - 1);
+    }
+
+    private boolean isWater(ChunkPrimer primer, int localX, int y, int localZ) {
+        if (localX < 0 || localX > 15 || y < 0 || y > 255 || localZ < 0 || localZ > 15) {
+            return false;
+        }
+
+        return primer.getBlockState(localX, y, localZ).getMaterial() == Material.WATER;
+    }
+
+    private boolean isWaterOrOutside(ChunkPrimer primer, int localX, int y, int localZ) {
+        if (localX < 0 || localX > 15 || y < 0 || y > 255 || localZ < 0 || localZ > 15) {
+            return true;
+        }
+
+        return primer.getBlockState(localX, y, localZ).getMaterial() == Material.WATER;
     }
 
     private boolean isLeakingFluidToSurface(ChunkPrimer primer, int localX, int y, int localZ, IBlockState state,
