@@ -192,6 +192,36 @@ public final class ModernCaveTerrainAPI {
      * biome-to-cave mappings used by older 1.12.2 cave mods, but targets the 3D underground biome sample instead
      * of replacing the whole cave generator.</p>
      *
+     * <p>Register definitions during your mod initialization, then use the attached decorator to place blocks
+     * when the sampled underground biome id matches your definition:</p>
+     *
+     * <pre>{@code
+     * ModernCaveTerrainAPI.registerUndergroundBiome(
+     *     ModernCaveTerrainUndergroundBiomeDefinition
+     *         .builder(new ResourceLocation("yourmod", "lush_caves"))
+     *         .surfaceBiomes("minecraft:jungle", "minecraft:jungle_hills")
+     *         .fallbackNeighborBiomes("minecraft:jungle", "minecraft:jungle_hills")
+     *         .yRange(8, 80)
+     *         .priority(100)
+     *         .selector((world, sample) ->
+     *             sample.getHumidity() > 0.35D ? 1.0D : 0.0D)
+     *         .decorator((context, definition) -> {
+     *             for (int localX = 0; localX < 16; localX++) {
+     *                 for (int localZ = 0; localZ < 16; localZ++) {
+     *                     for (int y = definition.getMinY(); y <= definition.getMaxY(); y++) {
+     *                         ModernCaveTerrainUndergroundBiomeSample sample =
+     *                             context.sampleUndergroundBiomeLocal(localX, y, localZ);
+     *                         if (definition.getId().equals(sample.getBiomeId())) {
+     *                             // Place lush-cave blocks, plants, roots, glow blocks, etc. here.
+     *                         }
+     *                     }
+     *                 }
+     *             }
+     *         })
+     *         .build()
+     * );
+     * }</pre>
+     *
      * @param definition underground biome definition
      */
     public static void registerUndergroundBiome(ModernCaveTerrainUndergroundBiomeDefinition definition) {
