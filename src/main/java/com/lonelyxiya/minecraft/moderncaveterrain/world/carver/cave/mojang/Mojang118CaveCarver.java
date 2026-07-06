@@ -49,8 +49,8 @@ public class Mojang118CaveCarver implements ICarver {
         }
     }
 
-    public void carveColumn(ChunkPrimer primer, int localX, int localZ, int blockX, int blockZ, int topY,
-                            IBlockState liquidBlock, boolean flooded, Biome biome) {
+    public void carveColumn(ChunkPrimer primer, Mojang118NoiseChunk noiseChunk, int localX, int localZ, int blockX,
+                            int blockZ, int topY, IBlockState liquidBlock, boolean flooded, Biome biome) {
         if (bottomY < 0 || bottomY > 255 || topY < 0 || topY > 255 || topY < bottomY) {
             return;
         }
@@ -61,7 +61,7 @@ public class Mojang118CaveCarver implements ICarver {
         for (int y = topY; y >= bottomY; y--) {
             double density = densitySampler.sampleDensity(blockX, y, blockZ);
             density = densitySampler.applySurfaceAdjustment(density, blockX, y, blockZ, topY, bottomY,
-                    surfaceCutoff, allowSurfaceEntrance);
+                    surfaceCutoff, allowSurfaceEntrance, densityThreshold);
 
             boolean digBlock = density <= densityThreshold;
             if (debugVisualizer) {
@@ -73,12 +73,43 @@ public class Mojang118CaveCarver implements ICarver {
                 continue;
             }
 
-            airBlockState = aquiferSampler.computeSubstance(blockX, y, blockZ, density, topY, seaLevel, flooded);
+            airBlockState = aquiferSampler.computeSubstance(blockX, y, blockZ, density, noiseChunk, seaLevel, flooded);
             if (airBlockState == null) {
                 continue;
             }
+            if (airBlockState.getMaterial() == Material.WATER
+                    && densitySampler.isSurfaceEntrance(blockX, y, blockZ, topY, densityThreshold)) {
+                airBlockState = Blocks.AIR.getDefaultState();
+            }
+            if (isLeakingFluidToSurface(primer, localX, y, localZ, airBlockState, topY, flooded)) {
+                airBlockState = Blocks.AIR.getDefaultState();
+            }
             CarverUtils.digBlockLocal(primer, localX, y, localZ, biome, airBlockState, null, -1, replaceFloatingGravel);
         }
+    }
+
+    private boolean isLeakingFluidToSurface(ChunkPrimer primer, int localX, int y, int localZ, IBlockState state,
+                                            int surfaceY, boolean flooded) {
+        if (flooded || state.getMaterial() != Material.WATER) {
+            return false;
+        }
+        if (surfaceY - y > 18) {
+            return false;
+        }
+
+        return isAirOrOutside(primer, localX, y + 1, localZ)
+                || isAirOrOutside(primer, localX + 1, y, localZ)
+                || isAirOrOutside(primer, localX - 1, y, localZ)
+                || isAirOrOutside(primer, localX, y, localZ + 1)
+                || isAirOrOutside(primer, localX, y, localZ - 1);
+    }
+
+    private boolean isAirOrOutside(ChunkPrimer primer, int localX, int y, int localZ) {
+        if (localX < 0 || localX > 15 || y < 0 || y > 255 || localZ < 0 || localZ > 15) {
+            return true;
+        }
+
+        return primer.getBlockState(localX, y, localZ).getBlock() == Blocks.AIR;
     }
 
     private boolean isOppositeFluidAdjacent(ChunkPrimer primer, int localX, int y, int localZ, IBlockState fluidState) {

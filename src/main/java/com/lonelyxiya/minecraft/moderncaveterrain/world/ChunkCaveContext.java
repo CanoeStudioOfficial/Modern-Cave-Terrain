@@ -147,6 +147,9 @@ public class ChunkCaveContext {
     }
 
     public int getSurfaceAltitude(int localX, int localZ) {
+        if (surfaceAltitudes == null) {
+            return 1;
+        }
         return surfaceAltitudes[columnIndex(localX, localZ)];
     }
 

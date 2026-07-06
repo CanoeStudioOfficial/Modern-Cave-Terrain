@@ -10,6 +10,7 @@ import com.lonelyxiya.minecraft.moderncaveterrain.world.WaterRegionController;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.MapGenModernCaveTerrain;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.carver.cave.mojang.Mojang118AquiferSampler;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.carver.cave.mojang.Mojang118CaveDensitySampler;
+import com.lonelyxiya.minecraft.moderncaveterrain.world.carver.cave.mojang.Mojang118NoiseChunk;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.mineshaft.MapGenModernMineshaft;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.ravine.MapGenModernCanyon;
 import net.minecraft.block.state.IBlockState;
@@ -290,12 +291,15 @@ public final class ModernCaveTerrainAPI {
                 config.getMojang118StyleCaveVerticalScale());
         double density = densitySampler.sampleDensity(blockX, blockY, blockZ);
         density = densitySampler.applySurfaceAdjustment(density, blockX, blockY, blockZ, surfaceY, bottomY,
-                config.getMojang118StyleCaveSurfaceCutoffDepth(), surfaceY > world.getSeaLevel());
+                config.getMojang118StyleCaveSurfaceCutoffDepth(), surfaceY > world.getSeaLevel(),
+                config.getMojang118StyleCaveDensityThreshold());
 
         double threshold = config.getMojang118StyleCaveDensityThreshold();
         boolean open = density <= threshold;
         Mojang118AquiferSampler aquiferSampler = new Mojang118AquiferSampler(world.getSeed());
-        IBlockState substance = aquiferSampler.computeSubstance(blockX, blockY, blockZ, density, surfaceY, world.getSeaLevel(), surfaceY <= world.getSeaLevel());
+        Mojang118NoiseChunk noiseChunk = new Mojang118NoiseChunk(world, blockX, blockZ, surfaceY);
+        IBlockState substance = aquiferSampler.computeSubstance(blockX, blockY, blockZ, density, noiseChunk,
+                world.getSeaLevel(), surfaceY <= world.getSeaLevel());
         IBlockState fluidState = substance != null && substance.getBlock() != Blocks.AIR ? substance : null;
 
         return new ModernCaveTerrainCaveSample(blockX, blockY, blockZ, density, threshold, open,

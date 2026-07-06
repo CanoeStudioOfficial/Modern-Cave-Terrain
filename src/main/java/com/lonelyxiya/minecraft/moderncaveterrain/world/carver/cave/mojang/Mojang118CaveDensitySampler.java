@@ -77,37 +77,57 @@ public class Mojang118CaveDensitySampler {
     }
 
     public double applySurfaceAdjustment(double density, int blockX, int blockY, int blockZ, int surfaceY,
-                                         int bottomY, int surfaceCutoff, boolean allowSurfaceEntrance) {
+                                         int bottomY, int surfaceCutoff, boolean allowSurfaceEntrance,
+                                         double densityThreshold) {
         int transitionBoundary = Math.max(bottomY, surfaceY - surfaceCutoff);
         int transitionHeight = Math.max(1, surfaceY - transitionBoundary);
-        double entranceStrength = allowSurfaceEntrance ? surfaceEntranceStrength(blockX, blockY, blockZ, surfaceY) : 0.0D;
+        double entranceAperture = allowSurfaceEntrance
+                ? surfaceEntranceAperture(density, blockX, blockY, blockZ, surfaceY, densityThreshold)
+                : 0.0D;
 
         if (blockY >= transitionBoundary) {
             double surfaceFactor = (double) (blockY - transitionBoundary) / transitionHeight;
-            density += surfaceFactor * 0.45D * (1.0D - entranceStrength * 0.92D);
+            density += surfaceFactor * 0.52D * (1.0D - entranceAperture);
         }
 
-        if (entranceStrength <= 0.0D || blockY > surfaceY) {
+        if (entranceAperture <= 0.0D || blockY > surfaceY) {
             return density;
         }
 
         int depthBelowSurface = surfaceY - blockY;
-        double mouthFade = clampedMap(depthBelowSurface, 0.0D, 18.0D, 1.0D, 0.0D);
-        double throatFade = clampedMap(depthBelowSurface, 4.0D, 36.0D, 0.65D, 0.0D);
-        double aperture = clampedMap(entranceStrength, 0.42D, 1.0D, 0.0D, 1.0D);
+        double mouthFade = clampedMap(depthBelowSurface, 0.0D, 12.0D, 1.0D, 0.0D);
+        double throatFade = clampedMap(depthBelowSurface, 4.0D, 34.0D, 0.45D, 0.0D);
 
-        return density - aperture * (mouthFade * 0.38D + throatFade * 0.18D);
+        return density - entranceAperture * (mouthFade * 0.16D + throatFade * 0.08D);
     }
 
-    private double surfaceEntranceStrength(int blockX, int blockY, int blockZ, int surfaceY) {
+    public boolean isSurfaceEntrance(int blockX, int blockY, int blockZ, int surfaceY, double densityThreshold) {
+        if (blockY > surfaceY || surfaceY - blockY > 28) {
+            return false;
+        }
+
+        return modernEntranceStrength(blockX, blockY, blockZ, surfaceY, densityThreshold) > 0.58D;
+    }
+
+    private double surfaceEntranceAperture(double density, int blockX, int blockY, int blockZ, int surfaceY,
+                                           double densityThreshold) {
+        int depthBelowSurface = Math.max(0, surfaceY - blockY);
+        double modernEntranceStrength = modernEntranceStrength(blockX, blockY, blockZ, surfaceY, densityThreshold);
+        double graphAlreadyOpen = clampedMap(density, densityThreshold + 0.24D, densityThreshold - 0.02D,
+                0.0D, 1.0D);
+        double verticalStrength = clampedMap(depthBelowSurface, 42.0D, 0.0D, 0.0D, 1.0D);
+
+        return Math.max(modernEntranceStrength, graphAlreadyOpen * modernEntranceStrength) * verticalStrength;
+    }
+
+    private double modernEntranceStrength(int blockX, int blockY, int blockZ, int surfaceY,
+                                          double densityThreshold) {
         double currentEntrance = entrances(blockX, toMojangY(blockY), blockZ);
         double surfaceEntrance = entrances(blockX, toMojangY(Math.max(0, surfaceY - 2)), blockZ);
         double entranceDensity = Math.min(currentEntrance, surfaceEntrance);
-        double densityStrength = clampedMap(entranceDensity, 0.20D, -0.16D, 0.0D, 1.0D);
-        int depthBelowSurface = Math.max(0, surfaceY - blockY);
-        double verticalStrength = clampedMap(depthBelowSurface, 36.0D, 0.0D, 0.0D, 1.0D);
 
-        return densityStrength * verticalStrength;
+        return clampedMap(5.0D * entranceDensity, densityThreshold + 0.26D,
+                densityThreshold - 0.08D, 0.0D, 1.0D);
     }
 
     private double slopedCheese(int blockX, double mojangY, int blockZ) {

@@ -12,6 +12,7 @@ import com.lonelyxiya.minecraft.moderncaveterrain.world.carver.ICarver;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.carver.cave.CaveCarver;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.carver.cave.CaveCarverBuilder;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.carver.cave.mojang.Mojang118CaveCarver;
+import com.lonelyxiya.minecraft.moderncaveterrain.world.carver.cave.mojang.Mojang118NoiseChunk;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.carver.vanilla.VanillaCaveCarver;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.carver.vanilla.VanillaCaveCarverBuilder;
 import net.minecraft.init.Blocks;
@@ -149,6 +150,7 @@ public class CaveCarverController {
         SubChunkColumnFields fields = new SubChunkColumnFields();
         fields.resetRanges(noiseRanges.size());
         ColumnNoiseBuffer[] noiseBuffers = new ColumnNoiseBuffer[noiseRanges.size()];
+        Mojang118NoiseChunk mojang118NoiseChunk = null;
 
         // Break into subchunks for noise interpolation
         for (int subX = 0; subX < subChunkCount; subX++) {
@@ -265,7 +267,13 @@ public class CaveCarverController {
                     }
                     else if (carver instanceof Mojang118CaveCarver) {
                         Mojang118CaveCarver mojang118CaveCarver = (Mojang118CaveCarver) carver;
-                        mojang118CaveCarver.carveColumn(primer, localX, localZ, chunkContext.getBlockX(localX), chunkContext.getBlockZ(localZ), fields.topYs[columnIndex], chunkContext.getLiquidBlock(localX, localZ), fields.flooded[columnIndex], chunkContext.getBiome(localX, localZ));
+                        if (mojang118NoiseChunk == null) {
+                            mojang118NoiseChunk = new Mojang118NoiseChunk(world, chunkContext);
+                        }
+                        mojang118CaveCarver.carveColumn(primer, mojang118NoiseChunk, localX, localZ,
+                                chunkContext.getBlockX(localX), chunkContext.getBlockZ(localZ),
+                                fields.topYs[columnIndex], chunkContext.getLiquidBlock(localX, localZ),
+                                fields.flooded[columnIndex], chunkContext.getBiome(localX, localZ));
                     }
                 }
             }
