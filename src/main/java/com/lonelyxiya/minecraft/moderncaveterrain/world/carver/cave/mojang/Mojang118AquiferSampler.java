@@ -140,6 +140,14 @@ public class Mojang118AquiferSampler {
         return shouldScheduleFluidUpdate;
     }
 
+    public IBlockState previewSubstance(int blockX, int blockY, int blockZ, double density,
+                                        Mojang118NoiseChunk noiseChunk, int seaLevel, boolean flooded) {
+        boolean previousShouldScheduleFluidUpdate = shouldScheduleFluidUpdate;
+        IBlockState state = computeSubstance(blockX, blockY, blockZ, density, noiseChunk, seaLevel, flooded);
+        shouldScheduleFluidUpdate = previousShouldScheduleFluidUpdate;
+        return state;
+    }
+
     public IBlockState sampleFluidState(int blockX, int blockY, int blockZ, int surfaceY, int seaLevel,
                                         boolean flooded) {
         Mojang118NoiseChunk noiseChunk = new Mojang118NoiseChunk(null, blockX, blockZ, surfaceY);

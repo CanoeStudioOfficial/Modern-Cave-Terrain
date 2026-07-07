@@ -100,13 +100,17 @@ public class Mojang118CaveCarver implements ICarver {
                 airBlockState = Blocks.AIR.getDefaultState();
             }
             if (isExposedLocalWater(primer, localX, y, localZ, airBlockState, topY, flooded)) {
-                airBlockState = Blocks.AIR.getDefaultState();
+                continue;
             }
             if (isLeakingFluidToSurface(primer, localX, y, localZ, airBlockState, topY, flooded, surfaceEntrance)) {
-                airBlockState = Blocks.AIR.getDefaultState();
+                continue;
+            }
+            if (wouldExposePredictedCaveAir(primer, noiseChunk, localX, y, localZ, blockX, blockZ, airBlockState,
+                    flooded)) {
+                continue;
             }
             if (shouldSuppressUnstableFluid(primer, localX, y, localZ, airBlockState)) {
-                airBlockState = Blocks.AIR.getDefaultState();
+                continue;
             }
             CarverUtils.digBlockLocal(primer, localX, y, localZ, biome, airBlockState, null, -1, replaceFloatingGravel);
         }
@@ -204,6 +208,58 @@ public class Mojang118CaveCarver implements ICarver {
         }
 
         return primer.getBlockState(localX, y, localZ).getBlock() == Blocks.AIR;
+    }
+
+    private boolean wouldExposePredictedCaveAir(ChunkPrimer primer, Mojang118NoiseChunk noiseChunk, int localX, int y,
+                                                int localZ, int blockX, int blockZ, IBlockState state,
+                                                boolean flooded) {
+        if (state.getMaterial() != Material.WATER && state.getMaterial() != Material.LAVA) {
+            return false;
+        }
+
+        if (wouldNeighborBecomeAir(primer, noiseChunk, localX + 1, y, localZ, blockX + 1, y, blockZ,
+                flooded)
+                || wouldNeighborBecomeAir(primer, noiseChunk, localX - 1, y, localZ, blockX - 1, y, blockZ,
+                flooded)
+                || wouldNeighborBecomeAir(primer, noiseChunk, localX, y, localZ + 1, blockX, y, blockZ + 1,
+                flooded)
+                || wouldNeighborBecomeAir(primer, noiseChunk, localX, y, localZ - 1, blockX, y, blockZ - 1,
+                flooded)) {
+            return true;
+        }
+
+        return wouldNeighborBecomeAir(primer, noiseChunk, localX, y - 1, localZ, blockX, y - 1, blockZ,
+                flooded);
+    }
+
+    private boolean wouldNeighborBecomeAir(ChunkPrimer primer, Mojang118NoiseChunk noiseChunk, int localX, int y,
+                                           int localZ, int blockX, int blockY, int blockZ, boolean flooded) {
+        if (y < bottomY || y > topY || y < 0 || y > 255) {
+            return false;
+        }
+        if (localX < 0 || localX > 15 || localZ < 0 || localZ > 15) {
+            return false;
+        }
+        if (primer.getBlockState(localX, y, localZ).getBlock() == Blocks.AIR) {
+            return true;
+        }
+
+        double rawDensity = densitySampler.sampleDensity(blockX, blockY, blockZ);
+        boolean allowSurfaceEntrance = !flooded;
+        int neighborSurfaceY = Math.min(topY, noiseChunk.surfaceY(blockX, blockZ));
+        double density = densitySampler.applySurfaceAdjustment(rawDensity, blockX, blockY, blockZ, neighborSurfaceY,
+                bottomY, surfaceCutoff, allowSurfaceEntrance, densityThreshold);
+        boolean surfaceEntrance = allowSurfaceEntrance
+                && densitySampler.shouldCarveSurfaceEntrance(rawDensity, density, blockX, blockY, blockZ,
+                neighborSurfaceY,
+                densityThreshold);
+        if (density > densityThreshold && !surfaceEntrance) {
+            return false;
+        }
+
+        IBlockState predictedState = aquiferSampler.previewSubstance(blockX, blockY, blockZ, density, noiseChunk,
+                seaLevel, flooded);
+        return predictedState == null || predictedState.getBlock() == Blocks.AIR;
     }
 
     private boolean shouldSuppressUnstableFluid(ChunkPrimer primer, int localX, int y, int localZ, IBlockState state) {
