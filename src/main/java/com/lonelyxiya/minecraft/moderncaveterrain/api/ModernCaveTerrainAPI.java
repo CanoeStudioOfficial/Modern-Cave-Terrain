@@ -10,6 +10,7 @@ import com.lonelyxiya.minecraft.moderncaveterrain.world.WaterRegionController;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.MapGenModernCaveTerrain;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.carver.cave.mojang.Mojang118AquiferSampler;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.carver.cave.mojang.Mojang118CaveDensitySampler;
+import com.lonelyxiya.minecraft.moderncaveterrain.world.carver.cave.mojang.Mojang118FluidPostProcessor;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.carver.cave.mojang.Mojang118NoiseChunk;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.mineshaft.MapGenModernMineshaft;
 import com.lonelyxiya.minecraft.moderncaveterrain.world.ravine.MapGenModernCanyon;
@@ -45,6 +46,7 @@ public final class ModernCaveTerrainAPI {
      */
     public static void registerTerrainGenerationHandler() {
         MinecraftForge.TERRAIN_GEN_BUS.register(new EventModernCaveTerrainGen());
+        MinecraftForge.EVENT_BUS.register(Mojang118FluidPostProcessor.INSTANCE);
     }
 
     /**
@@ -322,9 +324,9 @@ public final class ModernCaveTerrainAPI {
                 threshold);
         boolean open = density <= threshold || surfaceEntrance;
         Mojang118AquiferSampler aquiferSampler = new Mojang118AquiferSampler(world.getSeed(),
-                config.getLiquidAltitude());
+                config.getLiquidAltitude(), config.isFloodedUndergroundEnabled());
         Mojang118NoiseChunk noiseChunk = new Mojang118NoiseChunk(world, blockX, blockZ, surfaceY);
-        IBlockState substance = aquiferSampler.computeSubstance(blockX, blockY, blockZ, density, noiseChunk,
+        IBlockState substance = aquiferSampler.computeSubstance(blockX, blockY, blockZ, density - threshold, noiseChunk,
                 world.getSeaLevel(), surfaceY <= world.getSeaLevel());
         if (surfaceEntrance && substance != null && substance.getBlock() == Blocks.WATER) {
             substance = Blocks.AIR.getDefaultState();

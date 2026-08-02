@@ -268,7 +268,7 @@ public class CaveCarverController {
                     else if (carver instanceof Mojang118CaveCarver) {
                         Mojang118CaveCarver mojang118CaveCarver = (Mojang118CaveCarver) carver;
                         if (mojang118NoiseChunk == null) {
-                            mojang118NoiseChunk = new Mojang118NoiseChunk(world, chunkContext);
+                            mojang118NoiseChunk = mojang118CaveCarver.createNoiseChunk(chunkContext);
                         }
                         mojang118CaveCarver.carveColumn(primer, mojang118NoiseChunk, localX, localZ,
                                 chunkContext.getBlockX(localX), chunkContext.getBlockZ(localZ),
@@ -293,6 +293,9 @@ public class CaveCarverController {
         // Generate surface caves if enabled
         if (isSurfaceCavesEnabled) {
             surfaceCaveCarver.generate(world, chunkX, chunkZ, primer, false, chunkContext.getLiquidBlocksFlat(), FULL_CARVING_MASK_ROWS, chunkContext.getOceanMaskFlat(), chunkContext.getOceanMaskWidth(), chunkContext.getBiomes());
+        }
+        if (mojang118NoiseChunk != null) {
+            mojang118NoiseChunk.enqueueFluidPostProcessing();
         }
     }
 

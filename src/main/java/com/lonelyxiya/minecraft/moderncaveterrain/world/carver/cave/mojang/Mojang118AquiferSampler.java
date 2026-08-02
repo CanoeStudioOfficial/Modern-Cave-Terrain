@@ -21,12 +21,14 @@ public class Mojang118AquiferSampler {
     private static final int CELL_WIDTH = 16;
     private static final int CELL_HEIGHT = 12;
     private static final int FLUID_LEVEL_CELL_HEIGHT = 40;
+    private static final double FLUID_LEVEL_SPREAD_Y_SCALE = 0.7142857142857143D;
     private static final double PRESSURE_SIMILARITY_RANGE = 25.0D;
     private static final double FLOWING_UPDATE_SIMILARITY = similarity(10 * 10, 12 * 12);
     private static final double MIN_LOCAL_AQUIFER_DEPTH = 56.0D;
     private static final double MIN_LOCAL_AQUIFER_SURFACE_COVER = 24.0D;
 
     private final long seed;
+    private final boolean globalAquifersEnabled;
     private final int lavaBlockYLimit;
     private final int lavaFluidLevel;
     private final int randomLavaFluidLevel;
@@ -39,11 +41,16 @@ public class Mojang118AquiferSampler {
     private boolean shouldScheduleFluidUpdate;
 
     public Mojang118AquiferSampler(long seed) {
-        this(seed, DEFAULT_LAVA_ALTITUDE);
+        this(seed, DEFAULT_LAVA_ALTITUDE, true);
     }
 
     public Mojang118AquiferSampler(long seed, int liquidAltitude) {
+        this(seed, liquidAltitude, true);
+    }
+
+    public Mojang118AquiferSampler(long seed, int liquidAltitude, boolean globalAquifersEnabled) {
         this.seed = seed;
+        this.globalAquifersEnabled = globalAquifersEnabled;
         int lavaAltitude = clampInt(liquidAltitude, 0, 255);
         this.lavaBlockYLimit = lavaAltitude;
         this.lavaFluidLevel = (int) Math.floor(Mojang118NoiseChunk.toMojangY(Math.min(255, lavaAltitude + 1)));
@@ -62,7 +69,7 @@ public class Mojang118AquiferSampler {
         }
 
         double mojangY = Mojang118NoiseChunk.toMojangY(blockY);
-        FluidStatus globalFluid = computeGlobalFluid(mojangY, seaLevel, flooded);
+        FluidStatus globalFluid = computeGlobalFluid(mojangY, seaLevel);
         IBlockState globalState = globalFluid.at(mojangY);
         if (globalState.getBlock() == Blocks.LAVA) {
             shouldScheduleFluidUpdate = false;
@@ -73,14 +80,14 @@ public class Mojang118AquiferSampler {
         int gridY = gridY(mojangY + 1.0D);
         int gridZ = gridZ(blockZ - 5);
         ClosestCells closest = findClosestCells(blockX, mojangY, blockZ, gridX, gridY, gridZ);
-        FluidStatus status1 = getAquiferStatus(closest.index1, noiseChunk, seaLevel, flooded);
+        FluidStatus status1 = getAquiferStatus(closest.index1, noiseChunk, seaLevel);
         IBlockState substance = status1.at(mojangY);
         substance = protectLavaState(substance, blockY);
         double similarity12 = similarity(closest.distance1, closest.distance2);
 
         if (similarity12 <= 0.0D) {
             if (similarity12 >= FLOWING_UPDATE_SIMILARITY) {
-                FluidStatus status2 = getAquiferStatus(closest.index2, noiseChunk, seaLevel, flooded);
+                FluidStatus status2 = getAquiferStatus(closest.index2, noiseChunk, seaLevel);
                 shouldScheduleFluidUpdate = !status1.equals(status2);
             } else {
                 shouldScheduleFluidUpdate = false;
@@ -89,20 +96,20 @@ public class Mojang118AquiferSampler {
         }
 
         if (substance.getBlock() == Blocks.WATER
-                && computeGlobalFluid(Mojang118NoiseChunk.toMojangY(blockY - 1), seaLevel, flooded)
+                && computeGlobalFluid(Mojang118NoiseChunk.toMojangY(blockY - 1), seaLevel)
                 .at(Mojang118NoiseChunk.toMojangY(blockY - 1)).getBlock() == Blocks.LAVA) {
             shouldScheduleFluidUpdate = true;
             return substance;
         }
 
-        FluidStatus status2 = getAquiferStatus(closest.index2, noiseChunk, seaLevel, flooded);
+        FluidStatus status2 = getAquiferStatus(closest.index2, noiseChunk, seaLevel);
         double barrier = barrierPressure(blockX, mojangY, blockZ, status1, status2);
         if (density + similarity12 * barrier > 0.0D) {
             shouldScheduleFluidUpdate = false;
             return null;
         }
 
-        FluidStatus status3 = getAquiferStatus(closest.index3, noiseChunk, seaLevel, flooded);
+        FluidStatus status3 = getAquiferStatus(closest.index3, noiseChunk, seaLevel);
         double similarity13 = similarity(closest.distance1, closest.distance3);
         if (similarity13 > 0.0D) {
             double pressure13 = similarity12 * similarity13 * barrierPressure(blockX, mojangY, blockZ, status1, status3);
@@ -127,7 +134,7 @@ public class Mojang118AquiferSampler {
         if (!mayFlow12 && !mayFlow23 && !mayFlow13) {
             boolean mayFlow14 = similarity13 >= FLOWING_UPDATE_SIMILARITY
                     && similarity(closest.distance1, closest.distance4) >= FLOWING_UPDATE_SIMILARITY
-                    && !status1.equals(getAquiferStatus(closest.index4, noiseChunk, seaLevel, flooded));
+                    && !status1.equals(getAquiferStatus(closest.index4, noiseChunk, seaLevel));
             shouldScheduleFluidUpdate = mayFlow14;
         } else {
             shouldScheduleFluidUpdate = true;
@@ -140,19 +147,18 @@ public class Mojang118AquiferSampler {
         return shouldScheduleFluidUpdate;
     }
 
-    public IBlockState previewSubstance(int blockX, int blockY, int blockZ, double density,
-                                        Mojang118NoiseChunk noiseChunk, int seaLevel, boolean flooded) {
-        boolean previousShouldScheduleFluidUpdate = shouldScheduleFluidUpdate;
-        IBlockState state = computeSubstance(blockX, blockY, blockZ, density, noiseChunk, seaLevel, flooded);
-        shouldScheduleFluidUpdate = previousShouldScheduleFluidUpdate;
-        return state;
+    /** Matches the modern per-NoiseChunk aquifer cache lifetime. */
+    void resetForChunk() {
+        locationCache.clear();
+        statusCache.clear();
+        shouldScheduleFluidUpdate = false;
     }
 
     public IBlockState sampleFluidState(int blockX, int blockY, int blockZ, int surfaceY, int seaLevel,
                                         boolean flooded) {
         Mojang118NoiseChunk noiseChunk = new Mojang118NoiseChunk(null, blockX, blockZ, surfaceY);
         double mojangY = Mojang118NoiseChunk.toMojangY(blockY);
-        FluidStatus status = computeFluid(blockX, mojangY, blockZ, noiseChunk, seaLevel, flooded);
+        FluidStatus status = computeFluid(blockX, mojangY, blockZ, noiseChunk, seaLevel);
         IBlockState state = status.at(mojangY);
         state = protectLavaState(state, blockY);
         return state.getBlock() == Blocks.AIR ? null : state;
@@ -206,27 +212,25 @@ public class Mojang118AquiferSampler {
         return location;
     }
 
-    private FluidStatus getAquiferStatus(long cellKey, Mojang118NoiseChunk noiseChunk, int seaLevel, boolean flooded) {
+    private FluidStatus getAquiferStatus(long cellKey, Mojang118NoiseChunk noiseChunk, int seaLevel) {
         Long packedLocation = locationCache.get(cellKey);
         if (packedLocation == null) {
             return new FluidStatus(NO_FLUID_LEVEL, Blocks.AIR.getDefaultState());
         }
 
-        long statusKey = cellKey ^ noiseChunk.getCacheKey() ^ (flooded ? 0xC2B2AE3D27D4EB4FL : 0L);
-        FluidStatus cached = statusCache.get(statusKey);
+        FluidStatus cached = statusCache.get(cellKey);
         if (cached != null) {
             return cached;
         }
 
         FluidStatus status = computeFluid(unpackX(packedLocation), unpackY(packedLocation), unpackZ(packedLocation),
-                noiseChunk, seaLevel, flooded);
-        statusCache.put(statusKey, status);
+                noiseChunk, seaLevel);
+        statusCache.put(cellKey, status);
         return status;
     }
 
-    private FluidStatus computeFluid(int x, double mojangY, int z, Mojang118NoiseChunk noiseChunk, int seaLevel,
-                                     boolean flooded) {
-        FluidStatus globalFluid = computeGlobalFluid(mojangY, seaLevel, flooded);
+    private FluidStatus computeFluid(int x, double mojangY, int z, Mojang118NoiseChunk noiseChunk, int seaLevel) {
+        FluidStatus globalFluid = computeGlobalFluid(mojangY, seaLevel);
         int lowestPreliminarySurface = Integer.MAX_VALUE;
         int aquiferY = (int) Math.floor(mojangY);
         int topOfAquiferCell = aquiferY + 12;
@@ -246,7 +250,7 @@ public class Mojang118AquiferSampler {
 
             boolean topPokesAboveSurface = topOfAquiferCell > adjustedSurfaceLevel;
             if (topPokesAboveSurface || center) {
-                FluidStatus globalFluidAtSurface = computeGlobalFluid(adjustedSurfaceLevel, seaLevel, flooded);
+                FluidStatus globalFluidAtSurface = computeGlobalFluid(adjustedSurfaceLevel, seaLevel);
                 if (globalFluidAtSurface.at(adjustedSurfaceLevel).getBlock() != Blocks.AIR) {
                     if (center) {
                         surfaceAtCenterIsUnderGlobalFluidLevel = true;
@@ -271,17 +275,17 @@ public class Mojang118AquiferSampler {
                 localWaterAllowed));
     }
 
-    private FluidStatus computeGlobalFluid(double mojangY, int seaLevel, boolean flooded) {
+    private FluidStatus computeGlobalFluid(double mojangY, int seaLevel) {
         int seaMojangY = (int) Math.floor(Mojang118NoiseChunk.toMojangY(seaLevel));
         if (mojangY < lavaFluidLevel) {
             return new FluidStatus(lavaFluidLevel, Blocks.LAVA.getDefaultState());
         }
 
-        if (flooded) {
-            return new FluidStatus(seaMojangY, Blocks.WATER.getDefaultState());
+        if (!globalAquifersEnabled) {
+            return new FluidStatus(NO_FLUID_LEVEL, Blocks.AIR.getDefaultState());
         }
 
-        return new FluidStatus(NO_FLUID_LEVEL, Blocks.AIR.getDefaultState());
+        return new FluidStatus(seaMojangY, Blocks.WATER.getDefaultState());
     }
 
     private int computeSurfaceLevel(int blockX, double mojangY, int blockZ, FluidStatus globalFluid,
@@ -309,7 +313,7 @@ public class Mojang118AquiferSampler {
         int cellY = floorDiv((int) Math.floor(mojangY), FLUID_LEVEL_CELL_HEIGHT);
         int cellZ = floorDiv(blockZ, 16);
         int cellMiddleY = cellY * FLUID_LEVEL_CELL_HEIGHT + FLUID_LEVEL_CELL_HEIGHT / 2;
-        double spread = fluidLevelSpreadNoise.getValue(cellX, cellY, cellZ) * 10.0D;
+        double spread = fluidLevelSpreadNoise.getValue(cellX, cellY * FLUID_LEVEL_SPREAD_Y_SCALE, cellZ) * 10.0D;
         int quantizedSpread = quantize(spread, 3);
         int targetFluidSurfaceLevel = cellMiddleY + quantizedSpread;
 
@@ -379,7 +383,7 @@ public class Mojang118AquiferSampler {
         }
 
         double noise = gradient >= -2.0D && gradient <= 2.0D
-                ? barrierNoise.getValue(blockX * 0.5D, mojangY * 0.5D, blockZ * 0.5D)
+                ? barrierNoise.getValue(blockX, mojangY * 0.5D, blockZ)
                 : 0.0D;
 
         return 2.0D * (noise + gradient);
@@ -430,8 +434,11 @@ public class Mojang118AquiferSampler {
         return gridCoord * CELL_WIDTH + blockOffset;
     }
 
-    private static long cellKey(int cellX, int cellY, int cellZ) {
-        return (((long) cellX & 0x1FFFFFL) << 43) ^ (((long) cellY & 0x1FFFFFL) << 22) ^ ((long) cellZ & 0x3FFFFFL);
+    static long cellKey(int cellX, int cellY, int cellZ) {
+        // X/Z need 22 signed bits to cover the legacy +/-30M world border; modern Y needs fewer than 8 bits here.
+        return (((long) cellX & 0x3FFFFFL) << 30)
+                | (((long) cellY & 0xFFL) << 22)
+                | ((long) cellZ & 0x3FFFFFL);
     }
 
     private static long pack(int x, int y, int z) {

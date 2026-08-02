@@ -45,7 +45,8 @@ public class ConfigMisc {
 
     @Config.Name("Enable Flooded Underground")
     @Config.Comment(
-        "Set to true to enable flooded underground in ocean biomes.\n" +
+        "Set to true to enable flooded underground in ocean biomes and the global sea-level aquifer picker\n" +
+        "    for 1.18-style caves. Deep local water pockets may still form when this is disabled.\n" +
         "Default: true")
     public boolean enableFloodedUnderground = true;
 }

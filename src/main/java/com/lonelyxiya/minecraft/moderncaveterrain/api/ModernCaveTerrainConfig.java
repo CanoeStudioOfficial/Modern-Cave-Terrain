@@ -125,6 +125,11 @@ public final class ModernCaveTerrainConfig {
         return getInt(ModernCaveTerrainConfigOptions.LIQUID_ALTITUDE);
     }
 
+    /** Returns whether ocean flooding and the modern global sea-level aquifer picker are enabled. */
+    public boolean isFloodedUndergroundEnabled() {
+        return getBoolean(ModernCaveTerrainConfigOptions.FLOODED_UNDERGROUND_ENABLED);
+    }
+
     ConfigHolder unwrap() {
         return config;
     }

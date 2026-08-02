@@ -4,6 +4,7 @@ import com.lonelyxiya.minecraft.moderncaveterrain.world.ChunkCaveContext;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
+import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -29,17 +30,18 @@ public final class Mojang118NoiseChunk {
     private final int chunkMinBlockX;
     private final int chunkMinBlockZ;
     private final int singleColumnSurfaceY;
-    private final long cacheKey;
+    private final Mojang118PreliminarySurfaceSampler preliminarySurfaceSampler;
     private final Map<Long, Integer> preliminarySurfaceCache = new HashMap<>();
+    private final BitSet fluidPostProcessingPositions = new BitSet(16 * 256 * 16);
 
-    public Mojang118NoiseChunk(World world, ChunkCaveContext chunkContext) {
+    Mojang118NoiseChunk(World world, ChunkCaveContext chunkContext,
+                        Mojang118PreliminarySurfaceSampler preliminarySurfaceSampler) {
         this.world = world;
         this.chunkContext = chunkContext;
         this.chunkMinBlockX = chunkContext.getChunkX() * CHUNK_SIZE;
         this.chunkMinBlockZ = chunkContext.getChunkZ() * CHUNK_SIZE;
         this.singleColumnSurfaceY = -1;
-        this.cacheKey = ((((long) chunkContext.getChunkX()) & 0xffffffffL) << 32)
-                ^ (((long) chunkContext.getChunkZ()) & 0xffffffffL);
+        this.preliminarySurfaceSampler = preliminarySurfaceSampler;
     }
 
     public Mojang118NoiseChunk(World world, int blockX, int blockZ, int surfaceY) {
@@ -48,17 +50,12 @@ public final class Mojang118NoiseChunk {
         this.chunkMinBlockX = blockX & ~15;
         this.chunkMinBlockZ = blockZ & ~15;
         this.singleColumnSurfaceY = surfaceY;
-        this.cacheKey = ((((long) floorDiv(blockX, CHUNK_SIZE)) & 0xffffffffL) << 32)
-                ^ (((long) floorDiv(blockZ, CHUNK_SIZE)) & 0xffffffffL);
-    }
-
-    public long getCacheKey() {
-        return cacheKey;
+        this.preliminarySurfaceSampler = null;
     }
 
     public int preliminarySurfaceLevel(int sampleX, int sampleZ) {
-        int quantizedX = quartToBlock(blockToQuart(sampleX));
-        int quantizedZ = quartToBlock(blockToQuart(sampleZ));
+        int quantizedX = quantizeToQuartBlock(sampleX);
+        int quantizedZ = quantizeToQuartBlock(sampleZ);
         long key = columnKey(quantizedX, quantizedZ);
         Integer cached = preliminarySurfaceCache.get(key);
         if (cached != null) {
@@ -102,8 +99,24 @@ public final class Mojang118NoiseChunk {
         return MOJANG_MIN_Y + blockY / OLD_WORLD_MAX_Y * MOJANG_HEIGHT;
     }
 
+    void markFluidForPostProcessing(int localX, int blockY, int localZ) {
+        fluidPostProcessingPositions.set(Mojang118FluidPostProcessor.positionIndex(localX, blockY, localZ));
+    }
+
+    public void enqueueFluidPostProcessing() {
+        if (chunkContext == null || fluidPostProcessingPositions.isEmpty()) {
+            return;
+        }
+
+        Mojang118FluidPostProcessor.enqueue(world, chunkContext.getChunkX(), chunkContext.getChunkZ(),
+                fluidPostProcessingPositions);
+        fluidPostProcessingPositions.clear();
+    }
+
     private int computePreliminarySurfaceLevel(int blockX, int blockZ) {
-        int surfaceY = clamp(surfaceY(blockX, blockZ), 0, 255);
+        int surfaceY = preliminarySurfaceSampler != null
+                ? preliminarySurfaceSampler.sampleSurfaceY(blockX, blockZ)
+                : clamp(surfaceY(blockX, blockZ), 0, 255);
         return (int) Math.floor(toMojangY(surfaceY));
     }
 
@@ -113,6 +126,10 @@ public final class Mojang118NoiseChunk {
 
     private static int quartToBlock(int quartCoord) {
         return quartCoord * 4;
+    }
+
+    static int quantizeToQuartBlock(int blockCoord) {
+        return quartToBlock(blockToQuart(blockCoord));
     }
 
     private static long columnKey(int blockX, int blockZ) {

@@ -2,6 +2,9 @@ package com.lonelyxiya.minecraft.moderncaveterrain.world.carver.cave.mojang;
 
 import com.lonelyxiya.minecraft.moderncaveterrain.noise.MojangNormalNoise;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * A Java 8-friendly approximation of the 1.18 overworld cave density graph.
  *
@@ -13,6 +16,8 @@ public class Mojang118CaveDensitySampler {
     private static final double MOJANG_MIN_Y = -64.0D;
     private static final double MOJANG_HEIGHT = 384.0D;
     private static final double OLD_WORLD_MAX_Y = 255.0D;
+    private static final int INTERPOLATION_CELL_WIDTH = 4;
+    private static final int INTERPOLATION_CELL_HEIGHT = 8;
     private static final int SURFACE_ENTRANCE_MAX_DEPTH = 24;
     private static final double SURFACE_ENTRANCE_VISIBLE_STRENGTH = 0.74D;
     private static final double SURFACE_ENTRANCE_CARVE_STRENGTH = 0.70D;
@@ -40,6 +45,7 @@ public class Mojang118CaveDensitySampler {
 
     private final double horizontalScale;
     private final double verticalScale;
+    private final Map<Long, Double> interpolatedDensityCache = new HashMap<>();
 
     public Mojang118CaveDensitySampler(long seed, float horizontalScale, float verticalScale) {
         this.horizontalScale = horizontalScale;
@@ -69,14 +75,55 @@ public class Mojang118CaveDensitySampler {
 
     public double sampleDensity(int blockX, int blockY, int blockZ) {
         double mojangY = toMojangY(blockY);
+        double interpolatedDensity = sampleInterpolatedDensity(blockX, mojangY, blockZ);
+
+        return Math.min(squeeze(interpolatedDensity), noodle(blockX, mojangY, blockZ));
+    }
+
+    void resetForChunk() {
+        interpolatedDensityCache.clear();
+    }
+
+    private double sampleInterpolatedDensity(int blockX, double mojangY, int blockZ) {
+        int cellX = floorDiv(blockX, INTERPOLATION_CELL_WIDTH);
+        int cellY = floorDiv((int) Math.floor(mojangY), INTERPOLATION_CELL_HEIGHT);
+        int cellZ = floorDiv(blockZ, INTERPOLATION_CELL_WIDTH);
+        double xFactor = (blockX - cellX * INTERPOLATION_CELL_WIDTH) / (double) INTERPOLATION_CELL_WIDTH;
+        double yFactor = (mojangY - cellY * INTERPOLATION_CELL_HEIGHT) / INTERPOLATION_CELL_HEIGHT;
+        double zFactor = (blockZ - cellZ * INTERPOLATION_CELL_WIDTH) / (double) INTERPOLATION_CELL_WIDTH;
+
+        double density000 = sampleDensityCorner(cellX, cellY, cellZ);
+        double density100 = sampleDensityCorner(cellX + 1, cellY, cellZ);
+        double density010 = sampleDensityCorner(cellX, cellY + 1, cellZ);
+        double density110 = sampleDensityCorner(cellX + 1, cellY + 1, cellZ);
+        double density001 = sampleDensityCorner(cellX, cellY, cellZ + 1);
+        double density101 = sampleDensityCorner(cellX + 1, cellY, cellZ + 1);
+        double density011 = sampleDensityCorner(cellX, cellY + 1, cellZ + 1);
+        double density111 = sampleDensityCorner(cellX + 1, cellY + 1, cellZ + 1);
+
+        return lerp3(xFactor, yFactor, zFactor, density000, density100, density010, density110,
+                density001, density101, density011, density111);
+    }
+
+    private double sampleDensityCorner(int cellX, int cellY, int cellZ) {
+        long key = interpolationKey(cellX, cellY, cellZ);
+        Double cached = interpolatedDensityCache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+
+        int blockX = cellX * INTERPOLATION_CELL_WIDTH;
+        double mojangY = cellY * (double) INTERPOLATION_CELL_HEIGHT;
+        int blockZ = cellZ * INTERPOLATION_CELL_WIDTH;
         double slopedCheese = slopedCheese(blockX, mojangY, blockZ);
         double surfaceWithEntrances = Math.min(slopedCheese, 5.0D * entrances(blockX, mojangY, blockZ));
         double caves = slopedCheese < 1.5625D
                 ? surfaceWithEntrances
                 : underground(blockX, mojangY, blockZ, slopedCheese);
-        double fullNoise = Math.min(postProcess(slideOverworld(mojangY, caves)), noodle(blockX, mojangY, blockZ));
+        double density = slideOverworld(mojangY, caves) * 0.64D;
 
-        return fullNoise;
+        interpolatedDensityCache.put(key, density);
+        return density;
     }
 
     public double applySurfaceAdjustment(double density, int blockX, int blockY, int blockZ, int surfaceY,
@@ -313,10 +360,6 @@ public class Mojang118CaveDensitySampler {
         return lerp(bottomFactor, bottomTarget, value);
     }
 
-    private double postProcess(double density) {
-        return squeeze(density * 0.64D);
-    }
-
     private double mappedNoise(MojangNormalNoise noise, int blockX, double mojangY, int blockZ, double xzScale,
                                double yScale, double min, double max) {
         double value = sample(noise, blockX, mojangY, blockZ, xzScale, yScale);
@@ -355,6 +398,18 @@ public class Mojang118CaveDensitySampler {
         return from + factor * (to - from);
     }
 
+    static double lerp3(double xFactor, double yFactor, double zFactor,
+                        double density000, double density100, double density010, double density110,
+                        double density001, double density101, double density011, double density111) {
+        double lowerZ = lerp(xFactor, density000, density100);
+        double upperZ = lerp(xFactor, density001, density101);
+        double lower = lerp(zFactor, lowerZ, upperZ);
+        double lowerZAtTop = lerp(xFactor, density010, density110);
+        double upperZAtTop = lerp(xFactor, density011, density111);
+        double upper = lerp(zFactor, lowerZAtTop, upperZAtTop);
+        return lerp(yFactor, lower, upper);
+    }
+
     private static double cube(double value) {
         return value * value * value;
     }
@@ -367,6 +422,20 @@ public class Mojang118CaveDensitySampler {
 
     private static double clamp(double value, double min, double max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private static long interpolationKey(int cellX, int cellY, int cellZ) {
+        return (((long) cellX & 0xFFFFFFL) << 32)
+                | (((long) cellY & 0xFFL) << 24)
+                | ((long) cellZ & 0xFFFFFFL);
+    }
+
+    private static int floorDiv(int value, int divisor) {
+        int result = value / divisor;
+        if ((value ^ divisor) < 0 && result * divisor != value) {
+            result--;
+        }
+        return result;
     }
 
     private static double clampedMap(double value, double fromMin, double fromMax, double toMin, double toMax) {
